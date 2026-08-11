@@ -58,6 +58,8 @@ Next.js (Vercel)  ──REST/JSON──▶  FastAPI (Render)  ──▶  Postgre
 | Auth | Supabase Auth | Frontend `@supabase/ssr` + JWT verification in FastAPI via Supabase JWT secret |
 | AI — LLM | Groq (`meta-llama/llama-4-scout-17b-16e-instruct`), structured JSON outputs | Llama 4 Scout, 100% free tier API behind `LLMProvider` interface |
 | AI — Embeddings | NVIDIA Nemotron 3 Embed 1B (OpenRouter free) / FastEmbed | Free embedding model for resource semantic matching (P1) |
+| Frontend package manager | Bun | Fast JS runtime & package manager (`bun install`, `bun dev`) |
+| Backend package manager | uv | Ultra-fast Python package & venv manager (`uv venv`, `uv pip install`, `uv run`) |
 | Backend deploy | Render (Docker web service) | Railway/Fly are documented fallbacks, not both |
 | Frontend deploy | Vercel | |
 

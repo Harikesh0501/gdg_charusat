@@ -20,6 +20,8 @@
 | Auth | Supabase Auth | | Doc 02 (zero-cost, consolidated with DB) |
 | LLM | Groq (`meta-llama/llama-4-scout-17b-16e-instruct`) | | Doc 06 (Llama 4 Scout, free tier API, high speed) |
 | Embeddings | NVIDIA Nemotron 3 Embed 1B (OpenRouter free) / FastEmbed | | Doc 06, 07 (free embeddings) |
+| Frontend package manager | Bun | latest | Fast JS runtime & package manager |
+| Backend package manager | uv | latest | Ultra-fast Python package & venv manager |
 | Frontend hosting | Vercel | | Doc 13 |
 | Backend hosting | Render (Docker web service) | | Doc 13 |
 

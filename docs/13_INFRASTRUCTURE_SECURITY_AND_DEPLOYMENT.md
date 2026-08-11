@@ -29,8 +29,8 @@ Only if a specific platform has a hard blocker discovered during Phase 10 deploy
 
 ## Local Development
 
-- Backend: `uvicorn app.main:app --reload`, Postgres via a local Supabase CLI instance or a shared dev Supabase project (team's choice, not architecturally significant — document whichever is chosen in `reference.md` once decided).
-- Frontend: `next dev`.
+- Backend: `uv run uvicorn app.main:app --reload` (managed via `uv`), Postgres via local or shared Supabase dev project.
+- Frontend: `bun dev` (managed via `bun`).
 - Both read config from `.env.local` (frontend) / `.env` (backend), never committed (`.gitignore`'d from Phase 0).
 
 ## Environment Variables

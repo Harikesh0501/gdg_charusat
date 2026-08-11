@@ -21,10 +21,15 @@ This file is a persistent memory layer for AI coding agents working on SkillForg
 ## User Preferences / Explicit Feedback
 
 - **2026-08-11**: "don't want to use clerk" — Switched auth provider from Clerk to Supabase Auth (`@supabase/ssr` on frontend, JWT verification on FastAPI backend).
-- **2026-08-11**: "what if we use groq because i not have money" — Switched primary LLM provider from OpenAI (`gpt-4o-mini`) to Groq (`meta-llama/llama-4-scout-17b-16e-instruct` / Llama 4 Scout), utilizing Groq's 100% free API tier and FastEmbed for zero-cost embeddings.
+- **2026-08-11**: "what if we use groq because i not have money" — Switched primary LLM provider from OpenAI (`gpt-4o-mini`) to Groq (`meta-llama/llama-4-scout-17b-16e-instruct` / Llama 4 Scout), utilizing Groq's 100% free API tier and OpenRouter (`nvidia/nemotron-3-embed-1b`) / FastEmbed for zero-cost embeddings.
+- **2026-08-11**: "for frontend we prefer bun and in python we prefer uv for package manager" — Set `bun` as the frontend package manager/runtime and `uv` as the Python backend package/environment manager.
 
 ## Architectural Decisions Changed During Development
 
+- **2026-08-11 — Package Managers (npm/pip → bun/uv)**:
+  - *Old Decision*: Standard `npm` for frontend and `pip`/`venv` for backend.
+  - *New Decision*: `bun` for Next.js frontend package management and `uv` (`uv venv`, `uv pip`, `uv run`) for Python backend.
+  - *Rationale*: Extreme installation/execution speed, zero configuration friction on developer machine. Updated in `docs/13`, `docs/14`, `AGENT.md`.
 - **2026-08-11 — Auth Provider (Clerk → Supabase Auth)**:
   - *Old Decision*: Clerk managed identity provider for Next.js frontend and FastAPI backend.
   - *New Decision*: Supabase Auth (`@supabase/ssr` / `@supabase/supabase-js`) for frontend auth and Supabase JWT verification in FastAPI backend.
