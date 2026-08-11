@@ -72,9 +72,62 @@ Wrote all 20 documents plus this file, then performed a cross-document consisten
 
 **Verification**: Manual read-through consistency audit across all documents for: tech stack agreement, database entity/field naming agreement, API endpoint naming agreement, P0/P1/P2/P3 scope agreement, and AI-vs-deterministic responsibility boundary agreement. No contradictions found at authoring time. Note: this is a documentation consistency check, not a functional/code verification — there is no code yet to test.
 
-**Remaining Issues**: None documentation-level. Implementation has not started — Phase 0 (`phases.md`) is the next work item. Career-role and skill seed-data content still needs to be authored (referenced throughout docs 03/05/09 as a required but not-yet-created artifact).
+### 2026-08-11 — Phase 0: Project Scaffolding & Core Pipeline
+
+**Task**: Scaffold the complete initial repository infrastructure for both `frontend/` (Next.js 14 + Supabase SSR + Tailwind CSS) and `backend/` (FastAPI + SQLAlchemy + Alembic + Groq + OpenRouter/FastEmbed), managed via `bun` and `uv`.
+
+**Intended Outcome**: Working end-to-end pipeline with zero compilation/test errors, Supabase Auth user sync endpoint (`POST /api/auth/sync`), health check (`GET /api/health`), and Alembic DB migration for `users` and `profiles`.
+
+**Implementation**:
+- **Backend (`backend/`)**: Built `requirements.txt`, `core/config.py`, `core/db.py`, `core/auth.py` (Supabase JWT verification), `core/errors.py` (standard error envelope), `models/user.py` & `models/profile.py`, `schemas/auth.py` & `schemas/profile.py`, `api/health.py` & `api/auth.py`, `ai/providers/groq_provider.py` (Llama 4 Scout) & `openrouter_provider.py` (NVIDIA Nemotron 3 Embed 1B), `main.py`, `alembic/versions/0001_initial_users_and_profiles.py`, and `tests/test_health.py`. Virtual environment created via `uv venv` and dependencies installed via `uv pip install`.
+- **Frontend (`frontend/`)**: Built `package.json`, `tsconfig.json`, `tailwind.config.js`, `postcss.config.js`, `src/lib/supabase/` clients, `src/middleware.ts` (Supabase SSR route protection), `src/app/globals.css`, root `layout.tsx`, `page.tsx` landing page, `(auth)/sign-in` & `(auth)/sign-up` auth pages, and protected `dashboard/page.tsx` command center shell. Dependencies installed via `bun install`.
+- **Seed Scaffolding (`seed/`)**: Created `seed/README.md` and environment templates `.env.example`.
+
+**Files Changed**: Created `backend/` and `frontend/` application structures, `seed/README.md`, updated `.gitignore`, `workdone.md`, `AGENT.md`, `docs/01`–`14`, and `implementation_plan.md`.
+
+**Problems Encountered**:
+1. `uv pip install` timed out on `cryptography` package download — fixed by setting `$env:UV_HTTP_TIMEOUT="120"`.
+2. Pytest failed to import `app` module — fixed by adding `pytest.ini` with `pythonpath = .`.
+3. Pydantic V2 class Config deprecation warning — updated `app/schemas/profile.py` to `model_config = ConfigDict(from_attributes=True)`.
+4. Dashboard TypeScript type mismatch (`bool` vs `boolean`) — updated `SyncData` interface in `dashboard/page.tsx`.
+
+**User Feedback**: User explicitly specified removing Clerk (in favor of Supabase Auth), using Groq (`meta-llama/llama-4-scout-17b-16e-instruct`) for LLM, OpenRouter (`nvidia/nemotron-3-embed-1b`) for Embeddings, `bun` for frontend package manager, and `uv` for Python environment/package manager.
+
+**Verification**:
+- `uv run pytest`: 2 tests passed 100% (`GET /api/health` and root `/`).
+- `bun run build`: Next.js 14 production build compiled successfully (`✓ Generating static pages (7/7)` with zero errors).
+
+**Remaining Issues**: None for Phase 0.
+
+### 2026-08-11 — Phase 1: Authentication + Onboarding Form
+
+**Task**: Implement student profile repository/service, `PUT /api/profile` onboarding endpoint, interactive `/onboarding` form screen, and protected `(dashboard)` layout shell with onboarding completion guard.
+
+**Intended Outcome**: New users are forced through the onboarding form to collect `full_name`, `education_level`, `institution`, `graduation_year`, `interests`, and `bio`. Completing onboarding sets `onboarding_completed = true` and unlocks access to the dashboard.
+
+**Implementation**:
+- **Backend**:
+  - `app/repositories/profile.py`: `ProfileRepository` with `get_by_id`, `get_by_user_id`, `update_profile`.
+  - `app/services/profile.py`: `ProfileService` with validation (required `full_name` and `education_level`).
+  - `app/schemas/profile.py`: Updated `ProfileUpdateRequest` with Pydantic Field validation limits.
+  - `app/api/profile.py`: `GET /api/profile` and `PUT /api/profile` endpoints.
+  - `app/main.py`: Mounted `profile.router`.
+  - `tests/test_profile.py` & `tests/conftest.py`: Added pytest unit tests and test client fixture.
+- **Frontend**:
+  - `app/onboarding/page.tsx`: Interactive multi-field onboarding screen with tag selection for career interests.
+  - `app/(dashboard)/layout.tsx`: Protected layout wrapper checking `onboarding_completed`; auto-redirects to `/onboarding` if false.
+  - `app/dashboard/page.tsx`: Updated onboarding status card with active status indicator and complete now CTA link.
+
+**Files Changed**: Created `app/repositories/profile.py`, `app/services/profile.py`, `app/api/profile.py`, `tests/test_profile.py`, `tests/conftest.py`, `app/onboarding/page.tsx`, `app/(dashboard)/layout.tsx`; modified `app/schemas/profile.py`, `app/main.py`, `app/dashboard/page.tsx`, `workdone.md`.
+
+**Problems Encountered**:
+1. Missing `client` pytest fixture — created `tests/conftest.py` exporting `TestClient(app)`.
+
+**Verification**:
+- `uv run pytest`: 4 tests passed 100% in 0.07s.
+- `bun run build`: Next.js 14 production build compiled successfully (`✓ Generating static pages (8/8)` with zero errors).
+
+**Remaining Issues**: None for Phase 1. Phase 2 (Resume Processing Pipeline) is the next bound work item in `phases.md`.
 
 **Lessons for Future Agents**:
-- This documentation set is intentionally opinionated and specific (exact table names, exact endpoint paths, exact scoring formulas) precisely so implementation doesn't require re-deriving design decisions. If you find yourself inventing a table name, endpoint path, or formula not in `docs/12` or the relevant domain doc, stop and check whether it already exists under a different name before adding a new one.
-- The single highest-risk area flagged during planning is resume parsing quality/format variance ([04](docs/04_RESUME_PROCESSING_ARCHITECTURE.md)) and seed-content authoring time ([09](docs/09_PROJECT_RESOURCE_AND_CERTIFICATION_SYSTEM.md)) — both are called out explicitly in `phases.md` as needing buffer time. If either overruns, the documented fallback is to protect the P0 golden path and cut from Phase 7 (interview prep, P1) first.
-- Do not begin implementation by reading only this file — it has no implementation content yet. Start at `AGENT.md`, then `phases.md` Phase 0.
+- Maintain `onboarding_completed` gating in `app/(dashboard)/layout.tsx` so un-onboarded users cannot bypass the profile setup step.
