@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "SkillForge AI"
+description = "A professional career intelligence workspace that turns a user's experience into clear skill gaps, an actionable roadmap, and explainable recommendations for their next career move."
+version = "1.0.0"
+id = "artifacts/skillforge"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21201
+
+[services.development]
+run = "pnpm --filter @workspace/skillforge run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/skillforge", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/skillforge/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21201"
+BASE_PATH = "/"
