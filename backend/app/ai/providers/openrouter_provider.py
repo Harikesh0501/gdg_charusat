@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 
 class OpenRouterEmbeddingProvider(EmbeddingProvider):
-    def __init__(self, api_key: str | None = None, model: str | None = None):
-        self.api_key = api_key or settings.OPENROUTER_API_KEY
+    def __init__(self, api_keys: list[str] | None = None, model: str | None = None):
+        self.api_keys = api_keys or settings.get_openrouter_api_keys()
         self.model = model or settings.OPENROUTER_EMBEDDING_MODEL
         self.fastembed_model = None
 
@@ -27,27 +27,29 @@ class OpenRouterEmbeddingProvider(EmbeddingProvider):
         if not texts:
             return []
 
-        if self.api_key:
-            try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    response = await client.post(
-                        "https://openrouter.ai/api/v1/embeddings",
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": self.model,
-                            "input": texts,
-                        },
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        return [item["embedding"] for item in data["data"]]
-                    else:
-                        logger.warning(f"OpenRouter embedding API returned {response.status_code}: {response.text}")
-            except Exception as e:
-                logger.warning(f"OpenRouter embedding call failed, dropping to FastEmbed fallback: {e}")
+        if self.api_keys:
+            for key_index, key in enumerate(self.api_keys):
+                try:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        response = await client.post(
+                            "https://openrouter.ai/api/v1/embeddings",
+                            headers={
+                                "Authorization": f"Bearer {key}",
+                                "Content-Type": "application/json",
+                            },
+                            json={
+                                "model": self.model,
+                                "input": texts,
+                            },
+                        )
+                        if response.status_code == 200:
+                            data = response.json()
+                            return [item["embedding"] for item in data["data"]]
+                        else:
+                            logger.warning(f"OpenRouter key {key_index + 1}/{len(self.api_keys)} API returned {response.status_code}: {response.text}")
+                except Exception as e:
+                    logger.warning(f"OpenRouter embedding call with key {key_index + 1} failed: {e}")
 
-        # Fallback to local FastEmbed
+        # Fallback to local FastEmbed if all OpenRouter keys fail
+        logger.info("Dropping to local FastEmbed fallback for text embeddings.")
         return await self._embed_fastembed(texts)

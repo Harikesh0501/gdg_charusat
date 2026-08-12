@@ -11,24 +11,31 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class GroqProvider(LLMProvider):
-    def __init__(self, api_key: str | None = None, model: str | None = None):
-        self.api_key = api_key or settings.GROQ_API_KEY
+    def __init__(self, api_keys: list[str] | None = None, model: str | None = None):
+        self.api_keys = api_keys or settings.get_groq_api_keys()
         self.model = model or settings.GROQ_MODEL
-        self.client = AsyncGroq(api_key=self.api_key) if self.api_key else None
+
+    def _get_client(self, api_key: str) -> AsyncGroq:
+        return AsyncGroq(api_key=api_key)
 
     async def ping(self) -> bool:
-        if not self.client:
+        if not self.api_keys:
             return False
-        try:
-            response = await self.client.chat.completions.create(
-                messages=[{"role": "user", "content": "ping"}],
-                model=self.model,
-                max_tokens=5,
-            )
-            return bool(response.choices and len(response.choices) > 0)
-        except Exception as e:
-            logger.warning(f"Groq provider ping failed: {e}")
-            return False
+
+        for key in self.api_keys:
+            try:
+                client = self._get_client(key)
+                response = await client.chat.completions.create(
+                    messages=[{"role": "user", "content": "ping"}],
+                    model=self.model,
+                    max_tokens=5,
+                )
+                if response.choices and len(response.choices) > 0:
+                    return True
+            except Exception as e:
+                logger.warning(f"Groq provider ping failed for key ending in ...{key[-4:]}: {e}")
+
+        return False
 
     async def generate_structured(
         self,
@@ -38,8 +45,8 @@ class GroqProvider(LLMProvider):
         schema: Type[T],
         max_retries: int = 1,
     ) -> T:
-        if not self.client:
-            raise RuntimeError("GROQ_API_KEY is not configured")
+        if not self.api_keys:
+            raise RuntimeError("No GROQ_API_KEY is configured")
 
         json_schema_prompt = (
             f"{system}\n\n"
@@ -54,28 +61,36 @@ class GroqProvider(LLMProvider):
         ]
 
         last_error = None
-        for attempt in range(max_retries + 1):
+        # Key rotation loop
+        for key_index, key in enumerate(self.api_keys):
             try:
-                response = await self.client.chat.completions.create(
-                    messages=messages,
-                    model=self.model,
-                    response_format={"type": "json_object"},
-                    temperature=0.2,
-                )
+                client = self._get_client(key)
+                for attempt in range(max_retries + 1):
+                    try:
+                        response = await client.chat.completions.create(
+                            messages=messages,
+                            model=self.model,
+                            response_format={"type": "json_object"},
+                            temperature=0.2,
+                        )
 
-                raw_json = response.choices[0].message.content
-                parsed = json.loads(raw_json)
-                return schema.model_validate(parsed)
+                        raw_json = response.choices[0].message.content
+                        parsed = json.loads(raw_json)
+                        return schema.model_validate(parsed)
 
-            except (ValidationError, json.JSONDecodeError, Exception) as e:
-                last_error = e
-                logger.warning(f"Groq structured generation attempt {attempt + 1} failed: {e}")
-                if attempt < max_retries:
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": f"Your previous response failed validation: {e}. Output ONLY valid JSON matching the schema.",
-                        }
-                    )
+                    except (ValidationError, json.JSONDecodeError) as e:
+                        last_error = e
+                        logger.warning(f"Groq structured generation attempt {attempt + 1} failed: {e}")
+                        if attempt < max_retries:
+                            messages.append(
+                                {
+                                    "role": "user",
+                                    "content": f"Your previous response failed validation: {e}. Output ONLY valid JSON matching the schema.",
+                                }
+                            )
 
-        raise RuntimeError(f"Groq structured output failed after retries: {last_error}")
+            except Exception as api_err:
+                last_error = api_err
+                logger.warning(f"Groq API key {key_index + 1}/{len(self.api_keys)} failed: {api_err}. Rotating to fallback key...")
+
+        raise RuntimeError(f"Groq structured output failed across all {len(self.api_keys)} keys: {last_error}")
