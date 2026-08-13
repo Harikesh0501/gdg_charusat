@@ -171,3 +171,70 @@ By default, SQLAlchemy's `Enum` type serializes Python `enum.Enum` instances usi
 - `uv run pytest`: 6 tests passed 100% in 17.36s.
 - `JWKS`: Fetched and validated `https://npcxcnvhoarhozpeaoir.supabase.co/auth/v1/.well-known/jwks.json` returns HTTP 200 with ES256 EC keys.
 
+### 2026-08-13 — Phase 2: Resume Ingestion & Skill Intelligence Pipeline
+
+**Task**: Implement end-to-end resume processing pipeline: in-memory PDF/DOCX text parsing, Groq Llama 4 Scout AI structured skill extraction, rapidfuzz skill taxonomy normalization, and interactive frontend Skills Profile command center.
+
+**Implementation**:
+- **Backend AI Extraction**: Built `app/ai/schemas/resume_extraction.py` (Pydantic V2 schema), `app/ai/prompts/resume_prompts.py`, and `app/ai/extractors/resume_extractor.py` using `GroqProvider`.
+- **In-Memory Text Parsing**: Built `app/services/text_extractor.py` using `pypdf` for `.pdf` and `python-docx` for `.docx`, enforcing in-memory processing without saving file bytes to disk or cloud storage per user explicit directive.
+- **Service & Normalization**: Built `app/services/resume.py` with `rapidfuzz` fuzzy matching against `skills` taxonomy (`skills.name`/`aliases`). Discards unmatched skills and calculates confidence (0.4–0.85) and proficiency (2 for flat list, 3 if skill is used in project/experience).
+- **API Endpoints**: Built `app/api/resume.py` (`POST /api/resume/upload`, `GET /api/resume/latest`, `GET /api/resume/{id}/status`) and `app/api/skills.py` (`GET /api/skills`, `POST /api/skills`, `DELETE /api/skills/{skill_id}`, `GET /api/skills/taxonomy`). Mounted in `app/main.py`.
+- **Frontend Command Center**: Built `frontend/src/app/(dashboard)/skills/page.tsx` with drag-and-drop file uploader, real-time polling indicator, interactive Skills Profile grid with source/proficiency badges, and manual skill entry modal.
+
+**Files Changed**: `backend/app/ai/schemas/resume_extraction.py`, `backend/app/ai/prompts/resume_prompts.py`, `backend/app/ai/extractors/resume_extractor.py`, `backend/app/services/text_extractor.py`, `backend/app/services/resume.py`, `backend/app/repositories/resume.py`, `backend/app/schemas/resume.py`, `backend/app/schemas/skill.py`, `backend/app/api/resume.py`, `backend/app/api/skills.py`, `backend/app/main.py`, `backend/tests/test_resume_processing.py`, `frontend/src/app/(dashboard)/skills/page.tsx`, `workdone.md`.
+
+**Verification**:
+- `uv run pytest`: 7 tests passed 100% in 0.74s.
+- `bun run build`: Next.js 14 production build compiled successfully (`✓ Generating static pages (9/9)` with zero errors).
+
+### 2026-08-13 — Dynamic Header Auth State Component (`HeaderNav`)
+
+**Task**: Replace static `Sign In` link in global `RootLayout` header with dynamic `HeaderNav` component.
+
+**Implementation**:
+- `frontend/src/app/components/HeaderNav.tsx`: Built client component subscribing to `supabase.auth.onAuthStateChange`. Displays `Dashboard`, user email badge, and `Sign Out` button when authenticated, or `Sign In` button when unauthenticated.
+- `frontend/src/app/layout.tsx`: Replaced static `<nav>` JSX with `<HeaderNav />`.
+
+**Files Changed**: `frontend/src/app/components/HeaderNav.tsx`, `frontend/src/app/layout.tsx`, `workdone.md`.
+
+**Verification**:
+- `bun run build`: Compiled 100% cleanly (`✓ Generating static pages (9/9)`).
+
+### 2026-08-13 — Supabase Client Singleton & Render Loop Fix
+
+**Task**: Fix unstyled white page / infinite React render loop freeze on `/skills` ("Checking Onboarding Status...").
+
+**Root Cause Identified**:
+`createClient()` in `src/lib/supabase/client.ts` instantiated a new `SupabaseClient` instance on every call. Components calling `createClient()` inside their render body and including `supabase` in `useEffect` dependency arrays (`[router, supabase]`) triggered an infinite render loop on every state change, locking React's render pipeline and blocking CSS compilation.
+
+**Implementation**:
+- `frontend/src/lib/supabase/client.ts`: Converted `createClient()` to a singleton pattern using `clientInstance`.
+- `frontend/src/app/(dashboard)/layout.tsx`, `dashboard/page.tsx`, `skills/page.tsx`, `HeaderNav.tsx`: Cleaned up `useEffect` dependency arrays to prevent re-triggering.
+
+**Files Changed**: `frontend/src/lib/supabase/client.ts`, `frontend/src/app/(dashboard)/layout.tsx`, `frontend/src/app/(dashboard)/dashboard/page.tsx`, `frontend/src/app/(dashboard)/skills/page.tsx`, `frontend/src/app/components/HeaderNav.tsx`, `workdone.md`.
+
+**Verification**:
+- `bun run build`: Compiled 100% cleanly (`✓ Generating static pages (9/9)`).
+
+### 2026-08-13 — Groq AI Model Configuration Update (`llama-3.3-70b-versatile`)
+
+**Task**: Fix `404 model_not_found` error on uploading resume for AI extraction (`The model meta-llama/llama-4-scout-17b-16e-instruct does not exist`).
+
+**Root Cause Identified**:
+The default `GROQ_MODEL` string in config/env was set to `meta-llama/llama-4-scout-17b-16e-instruct`, which is not an active endpoint string on Groq's production API. Groq API rejected requests with `404 model_not_found`.
+
+**Implementation**:
+- `backend/.env`: Updated `GROQ_MODEL` to `"llama-3.3-70b-versatile"`.
+- `backend/app/core/config.py`: Updated default `GROQ_MODEL` to `"llama-3.3-70b-versatile"`.
+
+**Files Changed**: `backend/.env`, `backend/app/core/config.py`, `workdone.md`.
+
+**Verification**:
+- Tested model execution directly against Groq API: `llama-3.3-70b-versatile` succeeded.
+- `uv run pytest`: 7 tests passed 100% in 1.88s.
+
+
+
+
+

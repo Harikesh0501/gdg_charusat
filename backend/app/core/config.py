@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # AI Providers (Groq Keys & Model)
     GROQ_API_KEY: str = ""
     GROQ_API_KEYS: Union[str, List[str]] = []
-    GROQ_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # OpenRouter Keys & Model
     OPENROUTER_API_KEY: str = ""

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { Compass, Sparkles } from 'lucide-react'
 import './globals.css'
 
+import HeaderNav from './components/HeaderNav'
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -28,18 +30,7 @@ export default function RootLayout({
               <span>SkillForge <span className="text-primary font-normal">AI</span></span>
             </Link>
 
-            <nav className="flex items-center gap-6">
-              <Link href="/dashboard" className="text-sm text-slate-300 hover:text-white transition-colors">
-                Dashboard
-              </Link>
-              <Link
-                href="/sign-in"
-                className="text-sm font-medium px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white transition-all flex items-center gap-1.5 shadow-lg shadow-primary/25"
-              >
-                <Sparkles className="w-4 h-4" />
-                Sign In
-              </Link>
-            </nav>
+            <HeaderNav />
           </div>
         </header>
 

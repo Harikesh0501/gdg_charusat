@@ -57,7 +57,7 @@ export default function DashboardLayout({
     }
 
     checkOnboarding()
-  }, [router, supabase])
+  }, [router])
 
   if (checking) {
     return (

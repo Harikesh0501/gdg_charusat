@@ -1,336 +1,586 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import {
+  Target,
   UploadCloud,
   FileText,
+  Sparkles,
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Sparkles,
   Plus,
+  Trash2,
   ShieldCheck,
+  Search,
+  BookOpen,
   Zap,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface StudentSkill {
   id: string
-  profile_id: string
   skill_id: number
   skill_name: string
-  skill_slug: string
-  skill_category: string
+  category: string
   proficiency: number
-  source: string
+  source: 'resume' | 'self_reported' | 'inferred' | 'assessment'
   confidence: number
   evidence: string | null
-  updated_at: string
 }
 
-interface ResumeStatus {
-  resume_id: string
-  status: 'uploaded' | 'processing' | 'processed' | 'failed'
-  file_name: string
-  created_at: string
+interface TaxonomySkill {
+  id: number
+  name: string
+  slug: string
+  category: string
+  aliases: string[]
+  difficulty: number
+  description: string | null
+}
+
+interface ResumeState {
+  id: string | null
+  file_name: string | null
+  status: 'uploaded' | 'processing' | 'processed' | 'failed' | null
+  extraction: any | null
 }
 
 const PROFICIENCY_LABELS: Record<number, { label: string; color: string }> = {
-  0: { label: 'None', color: 'bg-slate-800 text-slate-400 border-slate-700' },
-  1: { label: 'Aware', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-  2: { label: 'Beginner', color: 'bg-sky-500/10 text-sky-400 border-sky-500/20' },
-  3: { label: 'Intermediate', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
-  4: { label: 'Advanced', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-}
-
-const CATEGORY_NAMES: Record<string, string> = {
-  programming_language: 'Programming Languages',
-  framework_library: 'Frameworks & Libraries',
-  database: 'Databases',
-  cloud_devops: 'Cloud & DevOps',
-  data_ml: 'Data Science & AI/ML',
-  tool: 'Tools & Utilities',
-  soft_skill: 'Soft Skills',
-  concept: 'Concepts & Architecture',
+  0: { label: 'Unaware', color: 'text-slate-500 bg-slate-500/10 border-slate-500/20' },
+  1: { label: 'Beginner', color: 'text-sky-400 bg-sky-400/10 border-sky-400/20' },
+  2: { label: 'Intermediate', color: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/20' },
+  3: { label: 'Advanced', color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
+  4: { label: 'Expert', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
 }
 
 export default function SkillsPage() {
   const [skills, setSkills] = useState<StudentSkill[]>([])
-  const [resumeStatus, setResumeStatus] = useState<ResumeStatus | null>(null)
+  const [taxonomy, setTaxonomy] = useState<TaxonomySkill[]>([])
+  const [resumeState, setResumeState] = useState<ResumeState>({
+    id: null,
+    file_name: null,
+    status: null,
+    extraction: null,
+  })
+
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState<string>('')
 
-  const fetchSkillsAndStatus = useCallback(async () => {
+  // Manual Skill Add modal/form state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [selectedSkillId, setSelectedSkillId] = useState<number | ''>('')
+  const [selectedProficiency, setSelectedProficiency] = useState<number>(2)
+  const [addingSkill, setAddingSkill] = useState(false)
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const router = useRouter()
+  const supabase = createClient()
+  const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+
+  const fetchData = async () => {
     try {
       const { data: sessionResult } = await (supabase.auth as any).getSession()
       const session = sessionResult?.session
 
-      if (!session) return
-
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
-
-      // Fetch active resume status
-      const statusRes = await fetch(`${backendUrl}/api/resumes/status`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      })
-      if (statusRes.ok) {
-        const statusData = await statusRes.json()
-        setResumeStatus(statusData)
+      if (!session) {
+        router.push('/sign-in')
+        return
       }
 
-      // Fetch normalized skills
-      const skillsRes = await fetch(`${backendUrl}/api/profile/skills`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      })
+      const headers = { Authorization: `Bearer ${session.access_token}` }
+
+      // Fetch student skills
+      const skillsRes = await fetch(`${backendUrl}/api/skills`, { headers })
       if (skillsRes.ok) {
         const skillsData = await skillsRes.json()
-        setSkills(skillsData)
+        setSkills(skillsData.skills || [])
       }
-    } catch (err: any) {
-      console.warn('Failed to fetch skills/resume status:', err)
+
+      // Fetch taxonomy skills
+      const taxonomyRes = await fetch(`${backendUrl}/api/skills/taxonomy`, { headers })
+      if (taxonomyRes.ok) {
+        const taxonomyData = await taxonomyRes.json()
+        setTaxonomy(taxonomyData || [])
+      }
+
+      // Fetch latest resume status
+      const resumeRes = await fetch(`${backendUrl}/api/resume/latest`, { headers })
+      if (resumeRes.ok) {
+        const resumeData = await resumeRes.json()
+        if (resumeData.resume) {
+          setResumeState({
+            id: resumeData.resume.id,
+            file_name: resumeData.resume.file_name,
+            status: resumeData.resume.status,
+            extraction: resumeData.extraction,
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching skills page data:', err)
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }
 
   useEffect(() => {
-    fetchSkillsAndStatus()
-  }, [fetchSkillsAndStatus])
+    fetchData()
+  }, [router])
 
-  // Polling while resume status is processing
+  // Poll for resume status while processing
   useEffect(() => {
-    if (resumeStatus?.status === 'processing') {
-      const interval = setInterval(() => {
-        fetchSkillsAndStatus()
-      }, 2500)
-      return () => clearInterval(interval)
-    }
-  }, [resumeStatus?.status, fetchSkillsAndStatus])
+    if (resumeState.status !== 'processing' || !resumeState.id) return
+
+    const interval = setInterval(async () => {
+      try {
+        const { data: sessionResult } = await (supabase.auth as any).getSession()
+        const session = sessionResult?.session
+        if (!session) return
+
+        const res = await fetch(`${backendUrl}/api/resume/${resumeState.id}/status`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+
+        if (res.ok) {
+          const updatedResume = await res.json()
+          if (updatedResume.status !== 'processing') {
+            setResumeState((prev) => ({ ...prev, status: updatedResume.status }))
+            fetchData() // Re-fetch extracted skills once done!
+          }
+        }
+      } catch (err) {
+        console.warn('Error polling resume status:', err)
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [resumeState.status, resumeState.id])
 
   const handleFileUpload = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setError('Please upload a valid PDF document (.pdf)')
-      return
-    }
-
     setUploading(true)
-    setError(null)
+    setUploadError(null)
 
     try {
       const { data: sessionResult } = await (supabase.auth as any).getSession()
       const session = sessionResult?.session
 
       if (!session) {
-        setError('Authentication required')
-        setUploading(false)
+        router.push('/sign-in')
         return
       }
 
       const formData = new FormData()
       formData.append('file', file)
 
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
-      const res = await fetch(`${backendUrl}/api/resumes/upload`, {
+      const res = await fetch(`${backendUrl}/api/resume/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: formData,
       })
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}))
-        throw new Error(errJson.error?.message || 'Failed to upload resume')
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error?.message || 'Failed to upload resume')
       }
 
       const uploadData = await res.json()
-      setResumeStatus({
-        resume_id: uploadData.resume_id,
+      setResumeState({
+        id: uploadData.resume_id,
+        file_name: file.name,
         status: uploadData.status,
-        file_name: uploadData.file_name,
-        created_at: new Date().toISOString(),
+        extraction: null,
       })
-
-      fetchSkillsAndStatus()
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during upload')
+      setUploadError(err.message || 'Error uploading file')
     } finally {
       setUploading(false)
     }
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleAddManualSkill = async (e: React.FormEvent) => {
     e.preventDefault()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload(e.dataTransfer.files[0])
+    if (!selectedSkillId) return
+
+    setAddingSkill(true)
+    try {
+      const { data: sessionResult } = await (supabase.auth as any).getSession()
+      const session = sessionResult?.session
+
+      if (!session) return
+
+      const res = await fetch(`${backendUrl}/api/skills`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          skill_id: Number(selectedSkillId),
+          proficiency: selectedProficiency,
+        }),
+      })
+
+      if (res.ok) {
+        setShowAddModal(false)
+        setSelectedSkillId('')
+        setSelectedProficiency(2)
+        fetchData()
+      }
+    } catch (err) {
+      console.warn('Error adding manual skill:', err)
+    } finally {
+      setAddingSkill(false)
     }
   }
 
-  // Group skills by category
-  const groupedSkills = skills.reduce((acc, skill) => {
-    const cat = skill.skill_category || 'other'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(skill)
-    return acc
-  }, {} as Record<string, StudentSkill[]>)
+  const handleRemoveSkill = async (skillId: number) => {
+    try {
+      const { data: sessionResult } = await (supabase.auth as any).getSession()
+      const session = sessionResult?.session
+
+      if (!session) return
+
+      const res = await fetch(`${backendUrl}/api/skills/${skillId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      if (res.ok) {
+        setSkills((prev) => prev.filter((s) => s.skill_id !== skillId))
+      }
+    } catch (err) {
+      console.warn('Error removing skill:', err)
+    }
+  }
+
+  // Filter skills
+  const categories = Array.from(new Set(skills.map((s) => s.category)))
+  const filteredSkills = skills.filter((s) => {
+    const matchesCategory = categoryFilter === 'all' || s.category === categoryFilter
+    const matchesSearch = s.skill_name.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
+
+  // Filter available taxonomy skills for manual addition (excluding already added)
+  const existingSkillIds = new Set(skills.map((s) => s.skill_id))
+  const availableTaxonomySkills = taxonomy.filter((t) => !existingSkillIds.has(t.id))
 
   if (loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-20 text-slate-400">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
-        <p className="text-sm font-medium">Loading Skill Profile...</p>
+        <p className="text-sm font-medium">Loading Skills Intelligence...</p>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-white/10 mb-8">
+    <div className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-white/10">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-primary uppercase tracking-wider mb-1">
-            <Zap className="w-4 h-4" />
+            <Target className="w-4 h-4" />
             Skill Intelligence Engine
           </div>
-          <h1 className="text-2xl font-bold text-white">Verified Skills & Proficiency Matrix</h1>
+          <h1 className="text-2xl font-bold text-white">Skills Profile & Resume AI</h1>
           <p className="text-sm text-slate-400 mt-1">
-            Upload your PDF resume for AI skill normalization or self-report your proficiencies.
+            Upload your resume for AI skill normalization or manage your verified technical competencies.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4" />
-            {skills.length} Skills Tracked
-          </div>
-        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-primary/20 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Add Skill Manually
+        </button>
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-red-400 text-sm">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Resume Upload Dropzone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={handleDrop}
-        className={`glass-panel p-8 rounded-2xl border-2 border-dashed transition-all text-center mb-10 ${
-          dragActive
-            ? 'border-primary bg-primary/10'
-            : 'border-white/10 hover:border-white/20'
-        }`}
-      >
-        <div className="max-w-md mx-auto flex flex-col items-center">
-          <div className="p-4 rounded-full bg-primary/10 text-primary mb-4">
-            <UploadCloud className="w-8 h-8" />
-          </div>
-
-          <h3 className="text-lg font-semibold text-white">
-            {resumeStatus?.status === 'processing'
-              ? 'AI Extraction in Progress...'
-              : 'Upload PDF Resume for AI Skill Extraction'}
-          </h3>
-          <p className="text-xs text-slate-400 mt-1.5 mb-6">
-            Supported format: PDF (max 5MB). Groq Llama 4 Scout extracts skills, projects, and evidence with zero hallucination.
-          </p>
-
-          {resumeStatus && (
-            <div className="mb-6 px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 flex items-center gap-3 text-xs text-slate-300">
-              <FileText className="w-4 h-4 text-primary" />
-              <span className="font-medium">{resumeStatus.file_name}</span>
-              <span className="text-slate-500">•</span>
-              <span className="capitalize">
-                {resumeStatus.status === 'processing' && (
-                  <span className="text-amber-400 inline-flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Processing
-                  </span>
-                )}
-                {resumeStatus.status === 'processed' && (
-                  <span className="text-emerald-400 inline-flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Processed
-                  </span>
-                )}
-                {resumeStatus.status === 'failed' && (
-                  <span className="text-red-400 inline-flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Failed
-                  </span>
-                )}
-              </span>
+      {/* Resume Upload & AI Extraction Section */}
+      <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-white/10 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <Sparkles className="w-5 h-5" />
             </div>
-          )}
+            <div>
+              <h2 className="text-lg font-bold text-white">AI Resume Extraction</h2>
+              <p className="text-xs text-slate-400">PDF or DOCX (max 5MB) • Instant Groq Llama 4 Scout parsing</p>
+            </div>
+          </div>
 
-          <label className="px-6 py-3 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold cursor-pointer shadow-lg shadow-primary/25 transition-all flex items-center gap-2">
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-            {uploading ? 'Uploading PDF...' : 'Select PDF File'}
-            <input
-              type="file"
-              accept=".pdf"
-              disabled={uploading}
-              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-              className="hidden"
-            />
-          </label>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-white/5">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Direct In-Memory Parsing (No Cloud File Storage)
+          </div>
         </div>
-      </div>
 
-      {/* Skills Matrix */}
-      {Object.keys(groupedSkills).length === 0 ? (
-        <div className="glass-panel p-12 rounded-2xl border border-white/10 text-center">
-          <Sparkles className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-white">No Skills Extracted Yet</h3>
-          <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto">
-            Upload your resume above or run the database seed script to populate canonical skills.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {Object.entries(groupedSkills).map(([catKey, catSkills]) => (
-            <div key={catKey} className="glass-panel p-6 rounded-2xl border border-white/10">
-              <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                {CATEGORY_NAMES[catKey] || catKey}
-                <span className="text-xs font-normal text-slate-500">({catSkills.length})</span>
-              </h3>
+        {uploadError && (
+          <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-red-400 text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{uploadError}</span>
+          </div>
+        )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {catSkills.map((sk) => {
-                  const profInfo = PROFICIENCY_LABELS[sk.proficiency] || PROFICIENCY_LABELS[1]
-                  return (
-                    <div
-                      key={sk.id}
-                      className="p-4 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition-all flex flex-col justify-between"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className="font-semibold text-sm text-white">{sk.skill_name}</span>
-                        <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${profInfo.color}`}>
-                          {profInfo.label}
-                        </span>
-                      </div>
-
-                      {sk.evidence && (
-                        <p className="text-xs text-slate-400 line-clamp-2 italic mb-3">
-                          &quot;{sk.evidence}&quot;
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-slate-500">
-                        <span className="capitalize">Source: {sk.source.replace('_', ' ')}</span>
-                        <span>Confidence: {Math.round(sk.confidence * 100)}%</span>
-                      </div>
-                    </div>
-                  )
-                })}
+        {/* Status Banners */}
+        {resumeState.status === 'processing' && (
+          <div className="mb-6 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between text-indigo-300 text-xs animate-pulse">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <div>
+                <p className="font-semibold">Parsing {resumeState.file_name}...</p>
+                <p className="text-slate-400 mt-0.5">Extracting text & matching skills via Groq Llama 4 Scout</p>
               </div>
             </div>
-          ))}
+            <span className="text-slate-400 font-mono text-[11px]">Status: Processing</span>
+          </div>
+        )}
+
+        {resumeState.status === 'processed' && (
+          <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-emerald-300 text-xs">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <div>
+                <p className="font-semibold">Active Resume: {resumeState.file_name}</p>
+                <p className="text-emerald-400/80 mt-0.5">AI extraction complete • Skills normalized into profile</p>
+              </div>
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-medium transition-all"
+            >
+              Re-upload Resume
+            </button>
+          </div>
+        )}
+
+        {resumeState.status === 'failed' && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-amber-300 text-xs">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400" />
+              <div>
+                <p className="font-semibold">Extraction Incomplete for {resumeState.file_name}</p>
+                <p className="text-amber-300/80 mt-0.5">File contains non-parseable text or scanned layout. You can add skills manually below.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium transition-all"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* File Dropzone */}
+        {resumeState.status !== 'processing' && (
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-white/10 hover:border-primary/50 bg-slate-900/40 hover:bg-slate-900/60 p-8 rounded-xl text-center cursor-pointer transition-all flex flex-col items-center justify-center group"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleFileUpload(file)
+              }}
+            />
+            {uploading ? (
+              <Loader2 className="w-10 h-10 animate-spin text-primary mb-2" />
+            ) : (
+              <UploadCloud className="w-10 h-10 text-slate-500 group-hover:text-primary transition-colors mb-2" />
+            )}
+            <p className="text-sm font-semibold text-white">
+              {uploading ? 'Uploading resume...' : 'Click to select or drag & drop your resume'}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">Supports PDF or DOCX up to 5MB</p>
+          </div>
+        )}
+      </div>
+
+      {/* Skills Profile Section */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-primary" />
+            Your Competencies ({skills.length})
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            {/* Search Input */}
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search skills..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary text-xs"
+              />
+            </div>
+
+            {/* Category Filter */}
+            {categories.length > 0 && (
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="py-2 px-3 rounded-xl bg-slate-900/60 border border-white/10 text-slate-300 text-xs focus:outline-none focus:border-primary"
+              >
+                <option value="all">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat} className="bg-slate-900">
+                    {cat.replace('_', ' ').toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+
+        {filteredSkills.length === 0 ? (
+          <div className="glass-panel p-12 rounded-2xl border border-white/5 text-center text-slate-400">
+            <Target className="w-12 h-12 mx-auto mb-3 text-slate-600" />
+            <h3 className="text-base font-semibold text-white mb-1">No Skills Found</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mb-4">
+              Upload your resume above or add skills manually to populate your personalized skill profile and unlock recommendations.
+            </p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary text-xs font-semibold transition-all inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> Add Your First Skill
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredSkills.map((item) => {
+              const profInfo = PROFICIENCY_LABELS[item.proficiency] || PROFICIENCY_LABELS[2]
+              return (
+                <div
+                  key={item.id}
+                  className="glass-panel p-5 rounded-xl border border-white/5 hover:border-white/10 transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="text-sm font-bold text-white">{item.skill_name}</h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${profInfo.color}`}>
+                        {profInfo.label}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded border border-white/5">
+                        {item.category.replace('_', ' ')}
+                      </span>
+
+                      {item.source === 'resume' ? (
+                        <span className="text-[10px] font-medium text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                          <Zap className="w-3 h-3" /> Resume Extracted
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">
+                          Self-Reported
+                        </span>
+                      )}
+                    </div>
+
+                    {item.evidence && (
+                      <p className="text-xs text-slate-400 italic line-clamp-2 bg-slate-900/40 p-2.5 rounded-lg border border-white/5">
+                        &quot;{item.evidence}&quot;
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-500">
+                    <span className="text-[11px]">Confidence: {Math.round(item.confidence * 100)}%</span>
+                    <button
+                      onClick={() => handleRemoveSkill(item.skill_id)}
+                      className="text-slate-500 hover:text-red-400 p-1 transition-colors"
+                      title="Remove Skill"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Add Skill Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md glass-panel p-6 rounded-2xl border border-white/10 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-1">Add Manual Skill</h3>
+            <p className="text-xs text-slate-400 mb-6">Select a skill from the curated taxonomy and assign your proficiency level.</p>
+
+            <form onSubmit={handleAddManualSkill} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Select Skill *
+                </label>
+                <select
+                  required
+                  value={selectedSkillId}
+                  onChange={(e) => setSelectedSkillId(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-sm focus:outline-none focus:border-primary"
+                >
+                  <option value="">-- Choose from taxonomy --</option>
+                  {availableTaxonomySkills.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.category.replace('_', ' ')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Proficiency Level
+                </label>
+                <select
+                  value={selectedProficiency}
+                  onChange={(e) => setSelectedProficiency(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-sm focus:outline-none focus:border-primary"
+                >
+                  <option value={1}>1 — Beginner (Basic familiarity)</option>
+                  <option value={2}>2 — Intermediate (Working knowledge)</option>
+                  <option value={3}>3 — Advanced (Proficient / Project experience)</option>
+                  <option value={4}>4 — Expert (Mastery / Professional experience)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-medium transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!selectedSkillId || addingSkill}
+                  className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {addingSkill ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Skill'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

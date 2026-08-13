@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LayoutDashboard, CheckCircle2, User, Sparkles, FileText, Map, AlertCircle, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { LayoutDashboard, CheckCircle2, User, Sparkles, FileText, Map, AlertCircle, Loader2, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface SyncData {
@@ -55,7 +56,7 @@ export default function DashboardPage() {
     }
 
     initDashboard()
-  }, [router, supabase])
+  }, [router])
 
   if (loading) {
     return (
@@ -101,8 +102,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Grid Modules Placeholder */}
+      {/* Grid Modules */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Onboarding & Profile Card */}
         <div className="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
           <div>
             <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-400 w-fit mb-4">
@@ -120,26 +122,37 @@ export default function DashboardPage() {
           <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-slate-500">
             <span>Profile ID: {syncData?.profile_id?.slice(0, 8) || 'Scaffolded'}...</span>
             {!syncData?.onboarding_completed && (
-              <a href="/onboarding" className="text-primary hover:underline font-medium">Complete Now →</a>
+              <Link href="/onboarding" className="text-primary hover:underline font-medium">Complete Now →</Link>
             )}
           </div>
         </div>
 
-        <div className="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col justify-between opacity-75">
+        {/* AI Resume & Skills Intelligence Card (Active Phase 2) */}
+        <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 flex flex-col justify-between">
           <div>
-            <div className="p-3 rounded-xl bg-sky-500/10 text-sky-400 w-fit mb-4">
+            <div className="p-3 rounded-xl bg-sky-500/10 text-sky-400 w-fit mb-4 flex items-center justify-between w-full">
               <FileText className="w-6 h-6" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                Active Feature
+              </span>
             </div>
-            <h3 className="text-lg font-semibold text-white">Resume Extraction</h3>
+            <h3 className="text-lg font-semibold text-white">Resume AI & Skills Profile</h3>
             <p className="text-xs text-slate-400 mt-2">
-              Upload PDF resume for AI skill normalization (Phase 2).
+              Upload PDF/DOCX resume for Groq Llama 4 Scout AI skill extraction & normalization.
             </p>
           </div>
-          <div className="mt-6 pt-4 border-t border-white/5 text-xs text-slate-500">
-            Phase 2 Feature
+          <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Phase 2 Feature</span>
+            <Link
+              href="/skills"
+              className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-primary/20"
+            >
+              Upload PDF →
+            </Link>
           </div>
         </div>
 
+        {/* Learning Roadmap Card */}
         <div className="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col justify-between opacity-75">
           <div>
             <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 w-fit mb-4">
@@ -151,7 +164,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="mt-6 pt-4 border-t border-white/5 text-xs text-slate-500">
-            Phase 5 Feature
+            Upcoming Phase 5 Feature
           </div>
         </div>
       </div>

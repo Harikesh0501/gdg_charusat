@@ -1,249 +1,161 @@
-import io
-import json
+import uuid
 import logging
-from uuid import UUID
-from datetime import datetime
-from pypdf import PdfReader
+from typing import List, Optional, Tuple, Dict
+from rapidfuzz import process, fuzz
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
 
+from app.models.resume import Resume, ResumeStatus
 from app.models.skill import Skill
 from app.models.student_skill import StudentSkill, SkillSource
-from app.models.resume import Resume, ResumeExtraction, ProfileProject, ResumeStatus, ProjectSource
-from app.schemas.resume import ResumeExtractionSchema, StudentSkillResponse
-from app.ai.providers.groq_provider import GroqProvider
-from app.ai.prompts.resume import RESUME_SYSTEM_PROMPT, RESUME_USER_PROMPT_TEMPLATE
+from app.repositories.resume import ResumeRepository
+from app.services.text_extractor import extract_text_from_bytes
+from app.ai.extractors.resume_extractor import ResumeExtractor
+from app.ai.schemas.resume_extraction import ResumeExtractionResult
 
 logger = logging.getLogger(__name__)
 
-
-def extract_text_from_pdf(pdf_bytes: bytes) -> str:
-    try:
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-        extracted_text = []
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                extracted_text.append(text)
-        full_text = "\n".join(extracted_text).strip()
-        if len(full_text) < 30:
-            raise ValueError("Extracted text is too short or empty (scanned PDF without OCR)")
-        return full_text
-    except Exception as e:
-        logger.error(f"Failed to extract text from PDF: {e}")
-        raise ValueError(f"Could not read PDF text: {str(e)}")
-
-
-def match_skill_to_taxonomy(skill_string: str, all_skills: list[Skill]) -> Skill | None:
-    cleaned = skill_string.strip().lower()
-    for skill in all_skills:
-        # Check canonical name
-        if skill.name.lower() == cleaned or skill.slug.lower() == cleaned:
-            return skill
-        # Check aliases
-        for alias in skill.aliases:
-            if alias.lower() == cleaned:
-                return skill
-
-    # Substring / partial match fallback
-    for skill in all_skills:
-        if len(cleaned) >= 3 and (cleaned in skill.name.lower() or skill.name.lower() in cleaned):
-            return skill
-
-    return None
-
-
-async def process_resume_background(
-    resume_id: UUID,
-    profile_id: UUID,
-    pdf_bytes: bytes,
-    db: Session,
-):
-    resume = db.query(Resume).filter(Resume.id == resume_id).first()
-    if not resume:
-        return
-
-    try:
-        resume.status = ResumeStatus.PROCESSING
-        db.commit()
-
-        # Step 1: Extract PDF Text
-        raw_text = extract_text_from_pdf(pdf_bytes)
-
-        # Step 2: Call AI Provider (Groq Llama 4 Scout)
-        groq = GroqProvider()
-        user_prompt = RESUME_USER_PROMPT_TEMPLATE.format(raw_text=raw_text)
-
-        extraction_result: ResumeExtractionSchema = await groq.generate_structured(
-            system=RESUME_SYSTEM_PROMPT,
-            user=user_prompt,
-            schema=ResumeExtractionSchema,
-            max_retries=1,
-        )
-
-        # Save extraction record
-        extraction_record = ResumeExtraction(
-            resume_id=resume_id,
-            profile_id=profile_id,
-            raw_text=raw_text,
-            extracted_json=extraction_result.model_dump(),
-        )
-        db.add(extraction_record)
-
-        # Step 3: Skill Normalization & Upsert into student_skills
-        all_skills = db.query(Skill).all()
-        matched_skills_map: dict[int, dict] = {}
-
-        # Collect skills used in projects & experience for confidence bumping
-        project_skills_set = set()
-        for proj in extraction_result.projects + extraction_result.experience:
-            for s in proj.skills_used:
-                project_skills_set.add(s.strip().lower())
-
-        for skill_item in extraction_result.skills:
-            matched_skill = match_skill_to_taxonomy(skill_item.name, all_skills)
-            if matched_skill:
-                hint = skill_item.confidence_hint
-                base_confidence = 0.85 if hint == "high" else (0.65 if hint == "medium" else 0.45)
-
-                # Bump proficiency if skill is used in a project or experience
-                in_project = skill_item.name.strip().lower() in project_skills_set
-                proficiency = 3 if (in_project or hint == "high") else 2
-                if in_project:
-                    base_confidence = min(0.95, base_confidence + 0.1)
-
-                matched_skills_map[matched_skill.id] = {
-                    "skill_id": matched_skill.id,
-                    "proficiency": proficiency,
-                    "confidence": base_confidence,
-                    "evidence": skill_item.evidence or f"Extracted from resume ({matched_skill.name})",
-                }
-
-        # Upsert student_skills
-        for skill_id, skill_data in matched_skills_map.items():
-            existing = db.query(StudentSkill).filter(
-                StudentSkill.profile_id == profile_id,
-                StudentSkill.skill_id == skill_id,
-            ).first()
-
-            if existing:
-                # Never overwrite a self_reported skill assertion
-                if existing.source != SkillSource.SELF_REPORTED:
-                    existing.proficiency = max(existing.proficiency, skill_data["proficiency"])
-                    existing.confidence = max(existing.confidence, skill_data["confidence"])
-                    existing.evidence = skill_data["evidence"]
-                    existing.updated_at = datetime.utcnow()
-            else:
-                new_student_skill = StudentSkill(
-                    profile_id=profile_id,
-                    skill_id=skill_id,
-                    proficiency=skill_data["proficiency"],
-                    source=SkillSource.RESUME,
-                    confidence=skill_data["confidence"],
-                    evidence=skill_data["evidence"],
-                )
-                db.add(new_student_skill)
-
-        # Step 4: Save extracted projects into profile_projects
-        for proj in extraction_result.projects:
-            matched_proj_skill_ids = []
-            for s_name in proj.skills_used:
-                ms = match_skill_to_taxonomy(s_name, all_skills)
-                if ms:
-                    matched_proj_skill_ids.append(ms.id)
-
-            profile_proj = ProfileProject(
-                profile_id=profile_id,
-                title=proj.title,
-                description=proj.description,
-                skill_ids=matched_proj_skill_ids,
-                source=ProjectSource.RESUME,
-            )
-            db.add(profile_proj)
-
-        resume.status = ResumeStatus.PROCESSED
-        db.commit()
-
-    except Exception as e:
-        logger.error(f"Resume background processing failed for resume {resume_id}: {e}")
-        resume.status = ResumeStatus.FAILED
-        db.commit()
+ALLOWED_EXTENSIONS = {"pdf", "docx"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 
 class ResumeService:
     def __init__(self, db: Session):
-        self.db = db
+        self.repo = ResumeRepository(db)
+        self.extractor = ResumeExtractor()
 
-    def get_active_resume(self, profile_id: UUID) -> Resume | None:
-        return self.db.query(Resume).filter(
-            Resume.profile_id == profile_id,
-            Resume.is_active == True,
-        ).first()
+    def validate_file(self, file_bytes: bytes, filename: str) -> str:
+        ext = filename.lower().split(".")[-1]
+        if ext not in ALLOWED_EXTENSIONS:
+            raise ValueError(f"Invalid file type .{ext}. Only .pdf and .docx files are supported.")
 
-    def get_student_skills(self, profile_id: UUID) -> list[StudentSkillResponse]:
-        student_skills = self.db.query(StudentSkill).filter(
-            StudentSkill.profile_id == profile_id
-        ).all()
+        if len(file_bytes) > MAX_FILE_SIZE:
+            raise ValueError("File size exceeds maximum limit of 5MB.")
 
-        results = []
-        for ss in student_skills:
-            if ss.skill:
-                results.append(
-                    StudentSkillResponse(
-                        id=ss.id,
-                        profile_id=ss.profile_id,
-                        skill_id=ss.skill_id,
-                        skill_name=ss.skill.name,
-                        skill_slug=ss.skill.slug,
-                        skill_category=ss.skill.category,
-                        proficiency=ss.proficiency,
-                        source=ss.source,
-                        confidence=ss.confidence,
-                        evidence=ss.evidence,
-                        updated_at=ss.updated_at,
+        return ext
+
+    def create_initial_resume(self, profile_id: uuid.UUID, filename: str) -> Resume:
+        return self.repo.create_resume_record(profile_id, filename)
+
+    async def process_resume_in_background(
+        self, resume_id: uuid.UUID, profile_id: uuid.UUID, file_bytes: bytes, filename: str
+    ):
+        """
+        Background task: parses resume file in-memory, calls Groq AI extraction,
+        normalizes skills via rapidfuzz against taxonomy, and updates student profile.
+        """
+        logger.info(f"Starting in-memory processing for resume {resume_id} (profile {profile_id})")
+        self.repo.update_resume_status(resume_id, ResumeStatus.PROCESSING)
+
+        try:
+            # 1. Text Extraction
+            raw_text = extract_text_from_bytes(file_bytes, filename)
+
+            # 2. AI Structured Extraction via Groq Llama 4 Scout
+            ai_result: ResumeExtractionResult = await self.extractor.extract_resume(raw_text)
+
+            # 3. Build Skill Taxonomy Search Index (names + aliases)
+            all_skills = self.repo.get_all_taxonomy_skills()
+            skill_lookup: Dict[str, Skill] = {}
+            choices: List[str] = []
+
+            for s in all_skills:
+                name_key = s.name.lower()
+                skill_lookup[name_key] = s
+                choices.append(name_key)
+                if s.aliases:
+                    for alias in s.aliases:
+                        alias_key = alias.lower()
+                        skill_lookup[alias_key] = s
+                        choices.append(alias_key)
+
+            # Collect all skills used across projects and experience to boost proficiency/confidence
+            skills_used_in_projects = set()
+            for p in ai_result.projects:
+                for sk in p.skills_used:
+                    skills_used_in_projects.add(sk.lower())
+
+            for exp in ai_result.experience:
+                for sk in exp.skills_used:
+                    skills_used_in_projects.add(sk.lower())
+
+            # 4. Normalize extracted skills via fuzzy matching against taxonomy
+            matched_skills_map: Dict[int, Tuple[Skill, float, int, Optional[str]]] = {}
+
+            confidence_map = {"low": 0.45, "medium": 0.65, "high": 0.85}
+
+            for extracted_skill in ai_result.skills:
+                raw_name = extracted_skill.name.strip().lower()
+                if not raw_name:
+                    continue
+
+                best_match = None
+                # Exact match
+                if raw_name in skill_lookup:
+                    best_match = skill_lookup[raw_name]
+                elif choices:
+                    # Fuzzy match with rapidfuzz (similarity threshold >= 82)
+                    match_res = process.extractOne(raw_name, choices, scorer=fuzz.WRatio)
+                    if match_res and match_res[1] >= 82:
+                        matched_key = match_res[0]
+                        best_match = skill_lookup.get(matched_key)
+
+                if best_match:
+                    base_confidence = confidence_map.get(extracted_skill.confidence_hint.lower(), 0.65)
+
+                    # Check if skill was mentioned in project/experience
+                    in_applied_work = raw_name in skills_used_in_projects or any(
+                        alias.lower() in skills_used_in_projects for alias in (best_match.aliases or [])
                     )
+
+                    proficiency = 3 if in_applied_work else 2
+                    confidence = min(0.95, base_confidence + (0.15 if in_applied_work else 0.0))
+
+                    if best_match.id not in matched_skills_map:
+                        matched_skills_map[best_match.id] = (
+                            best_match,
+                            confidence,
+                            proficiency,
+                            extracted_skill.evidence,
+                        )
+
+            # 5. Persist matched skills into student_skills
+            for skill_id, (skill_obj, confidence, proficiency, evidence) in matched_skills_map.items():
+                self.repo.upsert_student_skill(
+                    profile_id=profile_id,
+                    skill_id=skill_id,
+                    proficiency=proficiency,
+                    confidence=confidence,
+                    evidence=evidence,
+                    source=SkillSource.RESUME,
                 )
-        return results
 
-    def update_student_skill(self, profile_id: UUID, skill_id: int, proficiency: int) -> StudentSkillResponse:
-        skill = self.db.query(Skill).filter(Skill.id == skill_id).first()
-        if not skill:
-            raise HTTPException(status_code=404, detail={"code": "SKILL_NOT_FOUND", "message": "Skill not found in taxonomy"})
+            # 6. Persist projects into profile_projects
+            for project in ai_result.projects:
+                project_skill_ids = []
+                for sk_name in project.skills_used:
+                    k = sk_name.strip().lower()
+                    if k in skill_lookup:
+                        project_skill_ids.append(skill_lookup[k].id)
 
-        student_skill = self.db.query(StudentSkill).filter(
-            StudentSkill.profile_id == profile_id,
-            StudentSkill.skill_id == skill_id,
-        ).first()
+                self.repo.create_profile_project(
+                    profile_id=profile_id,
+                    title=project.title,
+                    description=project.description,
+                    skill_ids=project_skill_ids,
+                )
 
-        if student_skill:
-            student_skill.proficiency = proficiency
-            student_skill.source = SkillSource.SELF_REPORTED
-            student_skill.confidence = 1.0
-            student_skill.updated_at = datetime.utcnow()
-        else:
-            student_skill = StudentSkill(
+            # 7. Record Extraction Data
+            self.repo.create_extraction_record(
+                resume_id=resume_id,
                 profile_id=profile_id,
-                skill_id=skill_id,
-                proficiency=proficiency,
-                source=SkillSource.SELF_REPORTED,
-                confidence=1.0,
-                evidence="Self-reported by student",
+                raw_text=raw_text,
+                extracted_json=ai_result.model_dump(),
             )
-            self.db.add(student_skill)
 
-        self.db.commit()
-        self.db.refresh(student_skill)
+            # 8. Set status to processed
+            self.repo.update_resume_status(resume_id, ResumeStatus.PROCESSED)
+            logger.info(f"Resume {resume_id} successfully processed with {len(matched_skills_map)} skills extracted.")
 
-        return StudentSkillResponse(
-            id=student_skill.id,
-            profile_id=student_skill.profile_id,
-            skill_id=student_skill.skill_id,
-            skill_name=skill.name,
-            skill_slug=skill.slug,
-            skill_category=skill.category,
-            proficiency=student_skill.proficiency,
-            source=student_skill.source,
-            confidence=student_skill.confidence,
-            evidence=student_skill.evidence,
-            updated_at=student_skill.updated_at,
-        )
+        except Exception as e:
+            logger.error(f"Error processing resume {resume_id}: {e}", exc_info=True)
+            self.repo.update_resume_status(resume_id, ResumeStatus.FAILED)
