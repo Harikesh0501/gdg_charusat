@@ -234,6 +234,26 @@ The default `GROQ_MODEL` string in config/env was set to `meta-llama/llama-4-sco
 - Tested model execution directly against Groq API: `llama-3.3-70b-versatile` succeeded.
 - `uv run pytest`: 7 tests passed 100% in 1.88s.
 
+### 2026-08-13 — Phase 4: Career Goal Catalog & Deterministic Skill-Gap Engine
+
+**Task**: Implement career role catalog, target goal selection, 100% deterministic skill-gap & career readiness engine, unit tests, and Next.js frontend command center.
+
+**Implementation**:
+- **ORM & Database**: Built `app/models/career.py` (`CareerRole`, `CareerRoleSkill`, `SkillImportance`, `CareerGoal`), `alembic/versions/0003_career_roles_and_goals.py` migration, and `seed/career_roles.py` seeding script for 6 tech roles.
+- **Repository & Engine**: Built `app/repositories/career.py` (`CareerRepository`) and `app/services/skill_gap.py` (`SkillGapService`), implementing formula $\text{Readiness} = \frac{\sum \min(current, required)}{\sum required} \times 100$, priority calculation ($gap \times weight$), bucket classification (`HIGH`, `MEDIUM`, `LOW`), and mastered skill exclusion.
+- **Schemas & API**: Built `app/schemas/career.py` and `app/api/career.py` (`GET /api/career-roles`, `POST /api/career-goal`, `GET /api/career-goal`, `GET /api/skill-gap`). Mounted in `app/main.py`.
+- **Unit Tests**: Built `tests/test_skill_gap.py` verifying mathematical correctness, bucket classification, mastered skill isolation, and multi-student gap isolation.
+- **Frontend Command Center**: Built `frontend/src/app/(dashboard)/roadmap/page.tsx` (Career Readiness & Gap Command Center), `recommendations/page.tsx`, and `progress/page.tsx`.
+
+**Files Changed**: `backend/app/models/career.py`, `backend/app/models/__init__.py`, `backend/alembic/versions/0003_career_roles_and_goals.py`, `seed/career_roles.py`, `backend/app/repositories/career.py`, `backend/app/services/skill_gap.py`, `backend/app/schemas/career.py`, `backend/app/api/career.py`, `backend/app/main.py`, `backend/tests/test_skill_gap.py`, `backend/tests/conftest.py`, `frontend/src/app/(dashboard)/roadmap/page.tsx`, `frontend/src/app/(dashboard)/recommendations/page.tsx`, `frontend/src/app/(dashboard)/progress/page.tsx`, `workdone.md`.
+
+**Verification**:
+- `uv run alembic upgrade head`: Applied `0003_career` migration cleanly.
+- `uv run python ../seed/career_roles.py`: 6 career roles seeded.
+- `uv run pytest`: **9 passed (100%) in 18.13s**.
+- `bun run build`: Next.js 14 production build compiled successfully (`✓ Generating static pages (12/12)`).
+
+
 
 
 

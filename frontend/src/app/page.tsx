@@ -1,7 +1,22 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, BrainCircuit, Target, Map, Award, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, BrainCircuit, Target, Map, Award } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 export default function HomePage() {
+  const [user, setUser] = useState<any>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data } = await (supabase.auth as any).getSession()
+      setUser(data?.session?.user || null)
+    }
+    checkUser()
+  }, [])
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 max-w-6xl mx-auto text-center">
       <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full glass-panel border-indigo-500/30 text-xs font-semibold text-indigo-300 mb-8 shadow-lg shadow-indigo-500/10">
@@ -18,19 +33,39 @@ export default function HomePage() {
       </p>
 
       <div className="mt-10 flex flex-col sm:flex-row items-center gap-4">
-        <Link
-          href="/sign-up"
-          className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold flex items-center justify-center gap-2 shadow-xl shadow-primary/30 transition-all hover:scale-105"
-        >
-          Start Your Skill Gap Analysis
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-        <Link
-          href="/sign-in"
-          className="w-full sm:w-auto px-8 py-3.5 rounded-xl glass-panel text-slate-300 hover:text-white font-medium hover:border-white/20 transition-all"
-        >
-          Sign In to Dashboard
-        </Link>
+        {user ? (
+          <>
+            <Link
+              href="/dashboard"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold flex items-center justify-center gap-2 shadow-xl shadow-primary/30 transition-all hover:scale-105"
+            >
+              Go to Student Command Center
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/skills"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl glass-panel text-slate-300 hover:text-white font-medium hover:border-white/20 transition-all"
+            >
+              Skills & Resume AI
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/sign-up"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold flex items-center justify-center gap-2 shadow-xl shadow-primary/30 transition-all hover:scale-105"
+            >
+              Start Your Skill Gap Analysis
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/sign-in"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl glass-panel text-slate-300 hover:text-white font-medium hover:border-white/20 transition-all"
+            >
+              Sign In to Dashboard
+            </Link>
+          </>
+        )}
       </div>
 
       {/* Feature Cards Grid */}
@@ -41,7 +76,7 @@ export default function HomePage() {
           </div>
           <h3 className="text-lg font-semibold text-white mb-2">Skill-Gap Engine</h3>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Deterministic matching compares your 0–4 proficiency scale against required role competencies with zero halluncinations.
+            Deterministic matching compares your 0–4 proficiency scale against required role competencies with zero hallucinations.
           </p>
         </div>
 

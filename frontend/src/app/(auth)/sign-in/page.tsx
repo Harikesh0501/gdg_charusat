@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Sparkles, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react'
@@ -13,6 +13,16 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await (supabase.auth as any).getSession()
+      if (data?.session) {
+        router.push('/dashboard')
+      }
+    }
+    checkSession()
+  }, [router])
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()

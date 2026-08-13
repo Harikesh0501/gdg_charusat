@@ -3,6 +3,7 @@ from app.models.profile import Profile, EducationLevel
 from app.models.skill import Skill, SkillCategory, SkillPrerequisite
 from app.models.student_skill import StudentSkill, SkillSource
 from app.models.resume import Resume, ResumeExtraction, ProfileProject, ResumeStatus, ProjectSource
+from app.models.career import CareerRole, CareerRoleSkill, SkillImportance, CareerGoal
 
 __all__ = [
     "User",
@@ -18,4 +19,9 @@ __all__ = [
     "ProfileProject",
     "ResumeStatus",
     "ProjectSource",
+    "CareerRole",
+    "CareerRoleSkill",
+    "SkillImportance",
+    "CareerGoal",
 ]
+

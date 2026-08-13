@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Sparkles, Mail, Lock, AlertCircle, Loader2, CheckCircle2, MailCheck } from 'lucide-react'
@@ -14,6 +14,16 @@ export default function SignUpPage() {
   const [status, setStatus] = useState<'idle' | 'confirming' | 'redirecting'>('idle')
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await (supabase.auth as any).getSession()
+      if (data?.session) {
+        router.push('/dashboard')
+      }
+    }
+    checkSession()
+  }, [router])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.errors import http_exception_handler, unhandled_exception_handler
-from app.api import health, auth, profile, resume, skills
+from app.api import health, auth, profile, resume, skills, career
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -31,6 +31,8 @@ app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(profile.router, prefix=settings.API_V1_STR)
 app.include_router(resume.router, prefix=settings.API_V1_STR)
 app.include_router(skills.router, prefix=settings.API_V1_STR)
+app.include_router(career.router, prefix=settings.API_V1_STR)
+
 
 
 
