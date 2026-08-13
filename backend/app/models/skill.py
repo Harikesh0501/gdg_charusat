@@ -22,7 +22,7 @@ class Skill(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
     slug = Column(String, unique=True, nullable=False, index=True)
-    category = Column(Enum(SkillCategory, name="skill_category_enum"), nullable=False, index=True)
+    category = Column(Enum(SkillCategory, name="skill_category_enum", values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     aliases = Column(ARRAY(String).with_variant(JSON, "sqlite"), default=list, nullable=False)
     parent_skill_id = Column(Integer, ForeignKey("skills.id", ondelete="SET NULL"), nullable=True)
     difficulty = Column(Integer, default=1, nullable=False)
