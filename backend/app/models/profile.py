@@ -20,7 +20,10 @@ class Profile(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     full_name = Column(String, nullable=True)
-    education_level = Column(Enum(EducationLevel, name="education_level_enum"), nullable=True)
+    education_level = Column(
+        Enum(EducationLevel, name="education_level_enum", values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
     institution = Column(String, nullable=True)
     graduation_year = Column(Integer, nullable=True)
     interests = Column(ARRAY(String).with_variant(JSON, "sqlite"), default=list, nullable=True)

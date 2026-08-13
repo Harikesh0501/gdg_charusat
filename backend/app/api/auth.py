@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.auth import get_current_user, CurrentUser
+from app.core.auth import get_current_user, CurrentUser, decode_supabase_token
 from app.models.user import User
 from app.models.profile import Profile
 from app.schemas.auth import AuthSyncResponse
@@ -26,11 +26,7 @@ def sync_user(
 
     token = authorization.split(" ")[1]
     try:
-        if settings.SUPABASE_JWT_SECRET and settings.SUPABASE_JWT_SECRET != "super-secret-jwt-key-replace-in-env":
-            payload = jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
-        else:
-            payload = jwt.get_unverified_claims(token)
-
+        payload = decode_supabase_token(token)
         supabase_user_id: str = payload.get("sub")
         email: str | None = payload.get("email")
         if not supabase_user_id:

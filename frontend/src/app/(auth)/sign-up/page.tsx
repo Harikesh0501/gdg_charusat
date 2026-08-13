@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Sparkles, Mail, Lock, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
+import { Sparkles, Mail, Lock, AlertCircle, Loader2, CheckCircle2, MailCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SignUpPage() {
@@ -11,7 +11,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'confirming' | 'redirecting'>('idle')
   const router = useRouter()
   const supabase = createClient()
 
@@ -32,10 +32,11 @@ export default function SignUpPage() {
         return
       }
 
-      setSuccess(true)
-
-      // Sync user with backend if session active
       if (data.session) {
+        // Email confirmation is disabled — user is immediately signed in
+        setStatus('redirecting')
+
+        // Sync user with backend
         const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
         await fetch(`${backendUrl}/api/auth/sync`, {
           method: 'POST',
@@ -46,6 +47,10 @@ export default function SignUpPage() {
         }).catch(err => console.warn('Sync call failed:', err))
 
         setTimeout(() => router.push('/dashboard'), 1500)
+      } else {
+        // Email confirmation is required — user must verify email first
+        setStatus('confirming')
+        setLoading(false)
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred')
@@ -71,10 +76,23 @@ export default function SignUpPage() {
           </div>
         )}
 
-        {success && (
+        {status === 'redirecting' && (
           <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3 text-emerald-400 text-sm">
             <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>Account created successfully! Redirecting...</span>
+            <span>Account created successfully! Redirecting to dashboard...</span>
+          </div>
+        )}
+
+        {status === 'confirming' && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-300 text-sm">
+            <MailCheck className="w-5 h-5 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Check your email</p>
+              <p className="text-xs text-amber-300/80 mt-1">
+                We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then{' '}
+                <Link href="/sign-in" className="underline font-medium">sign in</Link>.
+              </p>
+            </div>
           </div>
         )}
 
@@ -91,7 +109,8 @@ export default function SignUpPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="student@example.com"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm"
+                disabled={status !== 'idle'}
+                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm disabled:opacity-50"
               />
             </div>
           </div>
@@ -109,18 +128,21 @@ export default function SignUpPage() {
                 minLength={6}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="•••••••• (min 6 characters)"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm"
+                disabled={status !== 'idle'}
+                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm disabled:opacity-50"
               />
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading || success}
-            className="w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all disabled:opacity-50 mt-6"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
-          </button>
+          {status === 'idle' && (
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all disabled:opacity-50 mt-6"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
+            </button>
+          )}
         </form>
 
         <p className="text-center text-xs text-slate-400 mt-6">

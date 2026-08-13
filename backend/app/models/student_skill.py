@@ -24,7 +24,11 @@ class StudentSkill(Base):
     profile_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True)
     skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
     proficiency = Column(Integer, nullable=False, default=1)  # 0 to 4 scale
-    source = Column(Enum(SkillSource, name="skill_source_enum"), default=SkillSource.RESUME, nullable=False)
+    source = Column(
+        Enum(SkillSource, name="skill_source_enum", values_callable=lambda x: [e.value for e in x]),
+        default=SkillSource.RESUME,
+        nullable=False,
+    )
     confidence = Column(Float, default=0.7, nullable=False)
     evidence = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

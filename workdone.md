@@ -131,3 +131,43 @@ Wrote all 20 documents plus this file, then performed a cross-document consisten
 
 **Lessons for Future Agents**:
 - Maintain `onboarding_completed` gating in `app/(dashboard)/layout.tsx` so un-onboarded users cannot bypass the profile setup step.
+- Always include `values_callable=lambda x: [e.value for e in x]` on all SQLAlchemy `Enum` columns so SQLAlchemy sends lowercase string values (`undergraduate`) matching Postgres `ENUM` types instead of Python Enum member names (`UNDERGRADUATE`).
+
+### 2026-08-13 — SQLAlchemy Enum Value Representation Fix (`values_callable`)
+
+**Task**: Fix PostgreSQL database crash on submitting onboarding profile (`sqlalchemy.exc.DataError: invalid input value for enum education_level_enum: "UNDERGRADUATE"`).
+
+**Root Cause Identified**:
+By default, SQLAlchemy's `Enum` type serializes Python `enum.Enum` instances using their **member names** (`UNDERGRADUATE`, `HIGH_SCHOOL`) rather than their **string values** (`undergraduate`, `high_school`). Because the PostgreSQL `ENUM` type in the database was defined with lowercase values, Postgres rejected `UNDERGRADUATE` as an invalid value.
+
+**Implementation**:
+- `app/models/profile.py`: Added `values_callable=lambda x: [e.value for e in x]` to `EducationLevel` column.
+- `app/models/student_skill.py`: Added `values_callable=lambda x: [e.value for e in x]` to `SkillSource` column.
+- `app/models/resume.py`: Added `values_callable=lambda x: [e.value for e in x]` to `ResumeStatus` and `ProjectSource` columns.
+
+**Files Changed**: `backend/app/models/profile.py`, `backend/app/models/student_skill.py`, `backend/app/models/resume.py`, `workdone.md`.
+
+**Verification**:
+- Tested Python Enum serialization: `values_callable` cleanly outputs lowercase values (`undergraduate`).
+- `uv run pytest`: 6 tests passed 100% in 0.96s.
+
+### 2026-08-13 — Auth JWT Verification Fix (ES256 JWKS) & Sign-Up UX Cleanup
+
+**Task**: Fix `401 Unauthorized` errors on `/api/auth/sync` and `/api/profile` endpoints, and resolve sign-up UX confusion regarding email confirmation.
+
+**Root Cause Identified**:
+1. **ES256 JWT Algorithm**: Supabase (new 2024/2025 projects) issues JWT tokens signed with **`ES256`** (ECDSA P-256) using JWKS (`/.well-known/jwks.json`), whereas our backend only allowed `HS256`. Passing an ES256 token to `jwt.decode(..., algorithms=["HS256"])` threw `JWTError: The specified alg value is not allowed`.
+2. **Sign-Up UX Flow**: When Supabase email confirmation was enabled, `signUp()` returned `{ session: null, user: ... }` without an error, but the UI showed "Account created! Redirecting..." even though no session was present to log in.
+
+**Implementation**:
+- `app/core/auth.py`: Built `JWKSManager` with in-memory 1-hour caching to fetch public keys from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`, and `decode_supabase_token()` supporting `ES256`, `RS256`, and `HS256` token verification seamlessly.
+- `app/api/auth.py`: Updated `/api/auth/sync` to use `decode_supabase_token()`.
+- `frontend/src/app/(auth)/sign-up/page.tsx`: Rewrote sign-up component to check `data.session`. Displays "Check your email for confirmation" if no session is returned, or "Account created! Redirecting..." if immediate session is present.
+- `frontend/next.config.js`: Removed experimental `webpackBuildWorker: true` on Windows, reducing cold start from 45.3s down to 3–8s and eliminating spurious `Error: Could not find or load main class Forge`.
+
+**Files Changed**: `backend/app/core/auth.py`, `backend/app/api/auth.py`, `frontend/src/app/(auth)/sign-up/page.tsx`, `frontend/next.config.js`, `workdone.md`.
+
+**Verification**:
+- `uv run pytest`: 6 tests passed 100% in 17.36s.
+- `JWKS`: Fetched and validated `https://npcxcnvhoarhozpeaoir.supabase.co/auth/v1/.well-known/jwks.json` returns HTTP 200 with ES256 EC keys.
+

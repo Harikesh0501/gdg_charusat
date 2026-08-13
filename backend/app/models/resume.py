@@ -26,7 +26,11 @@ class Resume(Base):
     profile_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True)
     file_name = Column(String, nullable=False)
     file_url = Column(String, nullable=False)
-    status = Column(Enum(ResumeStatus, name="resume_status_enum"), default=ResumeStatus.UPLOADED, nullable=False)
+    status = Column(
+        Enum(ResumeStatus, name="resume_status_enum", values_callable=lambda x: [e.value for e in x]),
+        default=ResumeStatus.UPLOADED,
+        nullable=False,
+    )
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -55,5 +59,9 @@ class ProfileProject(Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     skill_ids = Column(ARRAY(INTEGER).with_variant(JSON, "sqlite"), default=list, nullable=True)
-    source = Column(Enum(ProjectSource, name="project_source_enum"), default=ProjectSource.RESUME, nullable=False)
+    source = Column(
+        Enum(ProjectSource, name="project_source_enum", values_callable=lambda x: [e.value for e in x]),
+        default=ProjectSource.RESUME,
+        nullable=False,
+    )
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
