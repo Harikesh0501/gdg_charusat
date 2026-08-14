@@ -7,6 +7,7 @@ from app.repositories.career import CareerRepository
 from app.repositories.profile import ProfileRepository
 from app.services.skill_gap import SkillGapService
 from app.services.web_search_engine import InternetSearchEngine
+from app.services.project_milestones import ProjectMilestoneEngine
 from app.ai.extractors.recommendation_explanation import RecommendationExplanationExtractor
 
 logger = logging.getLogger(__name__)
@@ -171,47 +172,19 @@ class RecommendationService:
         if category == "project":
             first_skill = matched_skill_names[0] if matched_skill_names else "Python"
             title = getattr(item, "title", "Project")
+            description = getattr(item, "description", "")
 
             # Full-Internet Web & Repository Search Engine Query
             search_result = InternetSearchEngine.search_project_source(title, matched_skill_names)
             proj_url = search_result.get("url") or proj_url
             source_ref = search_result.get("source_reference", "Verified Internet Web Specification")
 
-            # 4 Step-by-Step Milestones with Dedicated Resource Links
-            milestones = [
-                {
-                    "id": "m1",
-                    "step": "Phase 1: Environment & Architecture Foundations",
-                    "task": f"Initialize project repository, virtual environment, and core project configuration for {first_skill}.",
-                    "resource_title": f"{first_skill} Project Architecture & Venv Guide",
-                    "resource_url": "https://docs.python.org/3/tutorial/venv.html",
-                    "resource_provider": "Python Docs"
-                },
-                {
-                    "id": "m2",
-                    "step": "Phase 2: Core Domain Logic & Algorithmic Engine",
-                    "task": f"Implement core computational logic, data models, and business services using {', '.join(matched_skill_names[:2])}.",
-                    "resource_title": f"{matched_skill_names[0] if matched_skill_names else first_skill} Core Tutorial & API Specs",
-                    "resource_url": f"https://developer.mozilla.org/en-US/search?q={first_skill.replace(' ', '+')}",
-                    "resource_provider": f"{first_skill} Official Docs"
-                },
-                {
-                    "id": "m3",
-                    "step": "Phase 3: Data Persistence & Integration Layer",
-                    "task": "Configure database schemas, ORM queries, caching layers, and external service contracts.",
-                    "resource_title": "PostgreSQL & Redis Caching Integration Specs",
-                    "resource_url": "https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html",
-                    "resource_provider": "SQLAlchemy Docs"
-                },
-                {
-                    "id": "m4",
-                    "step": "Phase 4: Automated Testing & Production Containerization",
-                    "task": "Write end-to-end integration tests, package into a multi-stage Docker container, and document setup in README.",
-                    "resource_title": "Docker Multi-Stage Build & Pytest Automation Specs",
-                    "resource_url": "https://docs.docker.com/build/building/multi-stage/",
-                    "resource_provider": "Docker Docs"
-                }
-            ]
+            # Technology & Domain-Aware 4-Phase Implementation Milestones
+            milestones = ProjectMilestoneEngine.generate_milestones(
+                title=title,
+                description=description,
+                skills=matched_skill_names
+            )
 
         return {
             "id": item.id,
