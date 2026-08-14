@@ -659,10 +659,12 @@ export default function LearningRoadmapPage() {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 text-indigo-600 text-xs font-bold transition-all shadow-2xs inline-flex items-center gap-1.5 hover:bg-indigo-50"
-                                            title="Open Resource"
+                                            title="Open Resource / Practice"
                                           >
                                             <BookOpen className="w-3.5 h-3.5" />
-                                            <span className="hidden sm:inline">Open Resource</span>
+                                            <span className="hidden sm:inline">
+                                              {item.type === 'skill' ? 'Start Practice' : item.type === 'milestone' ? 'View Spec' : 'Open Resource'}
+                                            </span>
                                             <ExternalLink className="w-3 h-3 text-indigo-500" />
                                           </a>
                                         )}

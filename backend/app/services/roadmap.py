@@ -121,14 +121,23 @@ class RoadmapService:
                 s_id_int = int(raw_s_id) if str(raw_s_id).isdigit() else raw_s_id
                 s_name = skill_obj.get("skill_name", skill_obj.get("name", f"Skill #{raw_s_id}"))
 
-                chapter_title = f"Chapter {order_idx}.{chap_idx}: {s_name} Foundations & Hands-On Practice"
+                chapter_title = f"Chapter {order_idx}.{chap_idx}: {s_name} Foundations & Hands-On Deep Dive"
 
-                # 1. Interactive Skill Lesson Item
+                # Match candidate resource from catalog
+                matched_res = next((r for r in catalog_resources if any(s.id == s_id_int for s in r.skills)), None)
+                res_url = matched_res.url if matched_res else f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
+                res_provider = matched_res.provider if matched_res else f"{s_name} Official Docs"
+                res_title = matched_res.title if matched_res else f"{s_name} Core Concepts & Tutorial"
+
+                # 1. Interactive Skill Practice Item with practice URL & provider
+                skill_url = f"https://google.com/search?q={s_name.replace(' ', '+')}+interactive+tutorial+docs"
                 skill_item = RoadmapItem(
                     id=str(uuid.uuid4()),
                     phase_id=phase_id,
                     type=RoadmapItemType.SKILL,
                     ref_skill_id=s_id_int,
+                    ref_url=skill_url,
+                    ref_provider=f"{s_name.upper()} PRACTICE LAB",
                     chapter_title=chapter_title,
                     title=f"Core Lesson & Concept Practice: {s_name}",
                     order_index=item_order,
@@ -139,11 +148,6 @@ class RoadmapService:
                 item_order += 1
 
                 # 2. Attached Real Learning Resource Item
-                matched_res = next((r for r in catalog_resources if any(s.id == s_id_int for s in r.skills)), None)
-                res_url = matched_res.url if matched_res else f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
-                res_provider = matched_res.provider if matched_res else f"{s_name} Official Documentation"
-                res_title = matched_res.title if matched_res else f"{s_name} Official Guide & Documentation"
-
                 res_item = RoadmapItem(
                     id=str(uuid.uuid4()),
                     phase_id=phase_id,
@@ -167,7 +171,6 @@ class RoadmapService:
             matched_proj = next((p for p in catalog_projects if any(s.id in [s_obj.get("skill_id") for s_obj in skills_in_phase] for s in p.skills)), None)
 
             proj_title = matched_proj.title if matched_proj else f"Complete Capstone Project demonstrating {', '.join(phase_skill_names)}"
-            proj_desc = matched_proj.description if matched_proj else "Build a production-grade portfolio project."
 
             milestone_item = RoadmapItem(
                 id=str(uuid.uuid4()),
@@ -191,8 +194,8 @@ class RoadmapService:
 
     def _backfill_roadmap_chapters_and_urls(self, roadmap: Roadmap):
         """
-        Backfills existing active roadmaps that were created before migration
-        to ensure every item has a distinct chapter title and real resource URL.
+        Backfills existing active roadmaps to ensure every item has a distinct chapter title,
+        a real resource URL, and provider badge.
         """
         from app.models.recommendation import Resource, Project
         catalog_resources = self.db.query(Resource).all()
@@ -223,7 +226,14 @@ class RoadmapService:
                     item.chapter_title = f"Chapter {p_order}.1: Core Learning Objectives"
                     modified = True
 
-                # 2. Backfill ref_url and ref_provider for RESOURCE items
+                # 2. Backfill ref_url and ref_provider for SKILL items
+                if item.type == RoadmapItemType.SKILL and not item.ref_url:
+                    s_name = item.ref_skill.name if item.ref_skill else "Skill"
+                    item.ref_url = f"https://google.com/search?q={s_name.replace(' ', '+')}+tutorial+docs"
+                    item.ref_provider = f"{s_name.upper()} PRACTICE LAB"
+                    modified = True
+
+                # 3. Backfill ref_url and ref_provider for RESOURCE items
                 if item.type == RoadmapItemType.RESOURCE:
                     if item.ref_skill_id:
                         matched_res = next((r for r in catalog_resources if any(s.id == item.ref_skill_id for s in r.skills)), None)
@@ -243,7 +253,7 @@ class RoadmapService:
                         item.ref_provider = new_provider
                         modified = True
 
-                # 3. Backfill ref_url for MILESTONE items
+                # 4. Backfill ref_url for MILESTONE items
                 if item.type == RoadmapItemType.MILESTONE:
                     if item.ref_url != "https://github.com/":
                         item.ref_url = "https://github.com/"
