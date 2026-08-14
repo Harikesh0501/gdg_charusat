@@ -96,21 +96,45 @@ class ProgressService:
             mastered_count = len(gap_report.get("mastered_skills", []))
             gaps_count = len(gap_report.get("gaps", []))
 
-        # Roadmap completion %
+        # Roadmap completion % & Chapter Breakdown
         active_roadmap = self.roadmap_repo.get_active_roadmap(profile_id, role_id) if role_id else None
         total_items = 0
         completed_items = 0
         roadmap_completion_pct = 0
 
+        chapters_map = {}
+
         if active_roadmap:
             for phase in active_roadmap.phases:
                 for item in phase.items:
                     total_items += 1
+                    c_title = item.chapter_title or f"Chapter {phase.order_index}.1: Core Learning Objectives"
+                    if c_title not in chapters_map:
+                        chapters_map[c_title] = {"total": 0, "completed": 0, "phase_title": phase.title}
+
+                    chapters_map[c_title]["total"] += 1
+
                     if item.status == RoadmapItemStatus.COMPLETED:
                         completed_items += 1
+                        chapters_map[c_title]["completed"] += 1
 
             if total_items > 0:
                 roadmap_completion_pct = round((completed_items / total_items) * 100)
+
+        total_chapters = len(chapters_map)
+        completed_chapters = sum(1 for c in chapters_map.values() if c["total"] > 0 and c["completed"] == c["total"])
+
+        chapter_breakdown = [
+            {
+                "chapter_title": c_title,
+                "phase_title": c_info["phase_title"],
+                "completed_items": c_info["completed"],
+                "total_items": c_info["total"],
+                "progress_percentage": round((c_info["completed"] / c_info["total"]) * 100) if c_info["total"] > 0 else 0,
+                "is_completed": c_info["completed"] == c_info["total"] and c_info["total"] > 0
+            }
+            for c_title, c_info in chapters_map.items()
+        ]
 
         # Recent activity stream
         raw_events = self.progress_repo.get_user_events(profile_id, limit=15)
@@ -133,5 +157,8 @@ class ProgressService:
             "roadmap_completion_percentage": roadmap_completion_pct,
             "completed_roadmap_items": completed_items,
             "total_roadmap_items": total_items,
+            "total_chapters_count": total_chapters,
+            "completed_chapters_count": completed_chapters,
+            "chapter_breakdown": chapter_breakdown,
             "activity_timeline": timeline
         }

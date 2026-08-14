@@ -15,8 +15,19 @@ import {
   BrainCircuit,
   Zap,
   Sparkles,
+  BookOpen,
+  Layers,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+
+interface ChapterBreakdownItem {
+  chapter_title: string
+  phase_title: string
+  completed_items: number
+  total_items: number
+  progress_percentage: number
+  is_completed: boolean
+}
 
 interface ActivityItem {
   id: string
@@ -34,6 +45,9 @@ interface ProgressData {
   roadmap_completion_percentage: number
   completed_roadmap_items: number
   total_roadmap_items: number
+  total_chapters_count?: number
+  completed_chapters_count?: number
+  chapter_breakdown?: ChapterBreakdownItem[]
   activity_timeline: ActivityItem[]
 }
 
@@ -201,7 +215,7 @@ export default function ProgressAnalyticsPage() {
       </div>
 
       {/* Roadmap Completion Progress Banner */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs">
+      <div className="glass-panel p-6 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs bg-white">
         <div className="flex items-center gap-4">
           <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 shrink-0">
             <Sparkles className="w-6 h-6" />
@@ -209,7 +223,7 @@ export default function ProgressAnalyticsPage() {
           <div>
             <h3 className="text-base font-bold text-slate-900">Roadmap Milestone Progress</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Completing roadmap skill items automatically bumps your proficiency level and increases your readiness score.
+              Completing roadmap skill items & chapters automatically bumps your proficiency level and increases your readiness score.
             </p>
           </div>
         </div>
@@ -217,9 +231,11 @@ export default function ProgressAnalyticsPage() {
         <div className="flex items-center gap-6 w-full md:w-auto">
           <div className="text-right">
             <span className="text-2xl font-black text-slate-900">
-              {data?.completed_roadmap_items || 0} / {data?.total_roadmap_items || 0}
+              {data?.completed_chapters_count || 0} / {data?.total_chapters_count || 0} Chapters
             </span>
-            <span className="text-xs text-slate-500 block font-bold">Items Completed ({data?.roadmap_completion_percentage || 0}%)</span>
+            <span className="text-xs text-slate-500 block font-bold">
+              {data?.completed_roadmap_items || 0}/{data?.total_roadmap_items || 0} Topics ({data?.roadmap_completion_percentage || 0}%)
+            </span>
           </div>
 
           <Link
@@ -230,6 +246,63 @@ export default function ProgressAnalyticsPage() {
           </Link>
         </div>
       </div>
+
+      {/* Chapter-by-Chapter Progression Analytics */}
+      {data?.chapter_breakdown && data.chapter_breakdown.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-indigo-600" />
+              Chapter-by-Chapter Progression ({data.completed_chapters_count}/{data.total_chapters_count} Mastered)
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {data.chapter_breakdown.map((chap) => (
+              <div
+                key={chap.chapter_title}
+                className={`glass-panel p-4 rounded-xl border flex flex-col justify-between space-y-3 transition-all ${
+                  chap.is_completed
+                    ? 'bg-emerald-50/60 border-emerald-200'
+                    : 'bg-white border-slate-200/90 hover:border-indigo-200'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                      {chap.phase_title}
+                    </span>
+                    <h3 className="text-xs font-bold text-slate-900 mt-0.5">{chap.chapter_title}</h3>
+                  </div>
+
+                  <span
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border shrink-0 ${
+                      chap.is_completed
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                        : 'bg-slate-100 border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {chap.is_completed ? 'Mastered ✓' : `${chap.progress_percentage}%`}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] text-slate-500 font-semibold">
+                    <span>{chap.completed_items}/{chap.total_items} Topics Completed</span>
+                    <span>{chap.progress_percentage}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                    <div
+                      className={`h-full transition-all duration-500 ${chap.is_completed ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                      style={{ width: `${chap.progress_percentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent Learning Activity Timeline */}
       <div className="space-y-4">

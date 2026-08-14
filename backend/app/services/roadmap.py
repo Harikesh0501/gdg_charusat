@@ -28,6 +28,7 @@ class RoadmapService:
     async def get_or_generate_roadmap(self, profile_id: str) -> Optional[Roadmap]:
         """
         Gets current active roadmap for profile, or generates a new one if target career goal exists.
+        Automatically upgrades/backfills existing roadmaps missing chapter titles or URLs.
         """
         # Check active career goal
         goal = self.career_repo.get_active_career_goal(profile_id)
@@ -37,6 +38,8 @@ class RoadmapService:
         # Check existing active roadmap
         active_roadmap = self.roadmap_repo.get_active_roadmap(profile_id, goal.career_role_id)
         if active_roadmap:
+            # Upgrade existing roadmap if missing chapter titles or ref_urls
+            self._backfill_roadmap_chapters_and_urls(active_roadmap)
             return active_roadmap
 
         # Generate new roadmap
@@ -185,6 +188,63 @@ class RoadmapService:
         # 7. Persist to DB
         saved_roadmap = self.roadmap_repo.save_roadmap(roadmap)
         return saved_roadmap
+
+    def _backfill_roadmap_chapters_and_urls(self, roadmap: Roadmap):
+        """
+        Backfills existing active roadmaps that were created before migration
+        to ensure every item has a distinct chapter title and real resource URL.
+        """
+        from app.models.recommendation import Resource, Project
+        catalog_resources = self.db.query(Resource).all()
+        catalog_projects = self.db.query(Project).all()
+        modified = False
+
+        for phase in roadmap.phases:
+            p_order = phase.order_index
+            chap_map = {}
+            chap_counter = 1
+
+            for item in phase.items:
+                # 1. Backfill chapter_title if missing or generic
+                if not item.chapter_title or "CORE LEARNING OBJECTIVES" in item.chapter_title:
+                    if item.ref_skill:
+                        s_name = item.ref_skill.name
+                        if s_name not in chap_map:
+                            chap_map[s_name] = f"Chapter {p_order}.{chap_counter}: {s_name} Mastery & Deep Dive"
+                            chap_counter += 1
+                        item.chapter_title = chap_map[s_name]
+                    elif item.type == RoadmapItemType.MILESTONE:
+                        item.chapter_title = f"Chapter {p_order}.{chap_counter}: Phase Capstone Milestone Project"
+                    else:
+                        item.chapter_title = f"Chapter {p_order}.1: Core Learning Objectives"
+                    modified = True
+
+                # 2. Backfill ref_url and ref_provider for RESOURCE items
+                if item.type == RoadmapItemType.RESOURCE and not item.ref_url:
+                    if item.ref_skill_id:
+                        matched_res = next((r for r in catalog_resources if any(s.id == item.ref_skill_id for s in r.skills)), None)
+                        if matched_res:
+                            item.ref_url = matched_res.url
+                            item.ref_provider = matched_res.provider
+                            if "Documentation" not in item.title and matched_res.title:
+                                item.title = f"Study Resource: {matched_res.title}"
+                        else:
+                            s_name = item.ref_skill.name if item.ref_skill else "Technical Skills"
+                            item.ref_url = f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
+                            item.ref_provider = f"{s_name} Official Documentation"
+                    else:
+                        item.ref_url = "https://developer.mozilla.org/"
+                        item.ref_provider = "Official Documentation"
+                    modified = True
+
+                # 3. Backfill ref_url for MILESTONE items
+                if item.type == RoadmapItemType.MILESTONE and not item.ref_url:
+                    item.ref_url = "https://github.com/"
+                    item.ref_provider = "SkillForge Portfolio Project"
+                    modified = True
+
+        if modified:
+            self.db.commit()
 
     def update_item_status(self, item_id: str, status: RoadmapItemStatus) -> RoadmapItem:
         updated = self.roadmap_repo.update_item_status(item_id, status)

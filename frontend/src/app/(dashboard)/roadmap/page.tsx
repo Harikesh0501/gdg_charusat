@@ -486,10 +486,23 @@ export default function LearningRoadmapPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-indigo-600" />
-            Learning Phases ({roadmap.phases.length} Phases)
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-indigo-600" />
+              Learning Phases ({roadmap.phases.length} Modules)
+            </h2>
+
+            {selectedRoleId && (
+              <button
+                onClick={() => handleSelectRole(selectedRoleId)}
+                disabled={generating}
+                className="px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
+                <span>Refresh Course Roadmap</span>
+              </button>
+            )}
+          </div>
 
           <div className="space-y-4">
             {roadmap.phases.map((phase, pIdx) => {
