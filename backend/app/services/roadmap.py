@@ -205,43 +205,50 @@ class RoadmapService:
             chap_counter = 1
 
             for item in phase.items:
-                # 1. Backfill chapter_title if missing or generic
-                if not item.chapter_title or "CORE LEARNING OBJECTIVES" in item.chapter_title:
-                    if item.ref_skill:
-                        s_name = item.ref_skill.name
-                        if s_name not in chap_map:
-                            chap_map[s_name] = f"Chapter {p_order}.{chap_counter}: {s_name} Mastery & Deep Dive"
-                            chap_counter += 1
+                # 1. Force update chapter_title to be specific per skill/milestone
+                if item.ref_skill:
+                    s_name = item.ref_skill.name
+                    if s_name not in chap_map:
+                        chap_map[s_name] = f"Chapter {p_order}.{chap_counter}: {s_name} Mastery & Hands-On Deep Dive"
+                        chap_counter += 1
+                    if item.chapter_title != chap_map[s_name]:
                         item.chapter_title = chap_map[s_name]
-                    elif item.type == RoadmapItemType.MILESTONE:
-                        item.chapter_title = f"Chapter {p_order}.{chap_counter}: Phase Capstone Milestone Project"
-                    else:
-                        item.chapter_title = f"Chapter {p_order}.1: Core Learning Objectives"
+                        modified = True
+                elif item.type == RoadmapItemType.MILESTONE:
+                    m_chap = f"Chapter {p_order}.{chap_counter}: Phase Capstone Milestone Project"
+                    if item.chapter_title != m_chap:
+                        item.chapter_title = m_chap
+                        modified = True
+                elif not item.chapter_title:
+                    item.chapter_title = f"Chapter {p_order}.1: Core Learning Objectives"
                     modified = True
 
                 # 2. Backfill ref_url and ref_provider for RESOURCE items
-                if item.type == RoadmapItemType.RESOURCE and not item.ref_url:
+                if item.type == RoadmapItemType.RESOURCE:
                     if item.ref_skill_id:
                         matched_res = next((r for r in catalog_resources if any(s.id == item.ref_skill_id for s in r.skills)), None)
                         if matched_res:
-                            item.ref_url = matched_res.url
-                            item.ref_provider = matched_res.provider
-                            if "Documentation" not in item.title and matched_res.title:
-                                item.title = f"Study Resource: {matched_res.title}"
+                            new_url = matched_res.url
+                            new_provider = matched_res.provider
                         else:
                             s_name = item.ref_skill.name if item.ref_skill else "Technical Skills"
-                            item.ref_url = f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
-                            item.ref_provider = f"{s_name} Official Documentation"
+                            new_url = f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
+                            new_provider = f"{s_name} Official Docs"
                     else:
-                        item.ref_url = "https://developer.mozilla.org/"
-                        item.ref_provider = "Official Documentation"
-                    modified = True
+                        new_url = "https://developer.mozilla.org/"
+                        new_provider = "Official Documentation"
+
+                    if item.ref_url != new_url or item.ref_provider != new_provider:
+                        item.ref_url = new_url
+                        item.ref_provider = new_provider
+                        modified = True
 
                 # 3. Backfill ref_url for MILESTONE items
-                if item.type == RoadmapItemType.MILESTONE and not item.ref_url:
-                    item.ref_url = "https://github.com/"
-                    item.ref_provider = "SkillForge Portfolio Project"
-                    modified = True
+                if item.type == RoadmapItemType.MILESTONE:
+                    if item.ref_url != "https://github.com/":
+                        item.ref_url = "https://github.com/"
+                        item.ref_provider = "SkillForge Portfolio Project"
+                        modified = True
 
         if modified:
             self.db.commit()
