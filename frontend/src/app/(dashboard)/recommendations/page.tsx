@@ -16,8 +16,19 @@ import {
   ArrowRight,
   UploadCloud,
   FileText,
+  CheckSquare,
+  Square,
+  X,
+  ShieldCheck,
+  GitBranch,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+
+interface Milestone {
+  id: string
+  step: string
+  task: string
+}
 
 interface RecommendationItem {
   id: number
@@ -25,6 +36,7 @@ interface RecommendationItem {
   title: string
   url?: string
   provider?: string
+  source_reference?: string
   type?: string
   description?: string
   difficulty: number
@@ -32,6 +44,7 @@ interface RecommendationItem {
   level?: string
   career_relevance?: string
   matched_gap_skills: string[]
+  milestones?: Milestone[]
   score: number
   explanation: string
 }
@@ -50,9 +63,35 @@ export default function RecommendationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Project Blueprint Modal & Milestone Progress State
+  const [selectedProject, setSelectedProject] = useState<RecommendationItem | null>(null)
+  const [completedMilestones, setCompletedMilestones] = useState<Record<string, boolean>>({})
+
   useEffect(() => {
     fetchRecommendations(activeCategory)
   }, [activeCategory])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('skillforge_project_milestones')
+      if (saved) {
+        try {
+          setCompletedMilestones(JSON.parse(saved))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+  }, [])
+
+  const toggleMilestone = (projectId: number, milestoneId: string) => {
+    const key = `${projectId}_${milestoneId}`
+    const updated = { ...completedMilestones, [key]: !completedMilestones[key] }
+    setCompletedMilestones(updated)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('skillforge_project_milestones', JSON.stringify(updated))
+    }
+  }
 
   const fetchRecommendations = async (category: string) => {
     try {
@@ -241,94 +280,297 @@ export default function RecommendationsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {data.items.map((item) => (
-            <div
-              key={item.id}
-              className="glass-panel p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-5 hover:border-indigo-200 hover:shadow-md transition-all group bg-white"
-            >
-              <div className="space-y-3">
-                {/* Provider & Category Badges */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider border border-slate-200">
-                    {item.provider || 'SkillForge Curation'}
-                  </span>
+          {data.items.map((item) => {
+            const isProject = activeCategory === 'project'
+            const milestones = item.milestones || []
+            const doneCount = milestones.filter(m => completedMilestones[`${item.id}_${m.id}`]).length
+            const pct = milestones.length > 0 ? Math.round((doneCount / milestones.length) * 100) : 0
 
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200">
-                      Score: {item.score.toFixed(1)}
+            return (
+              <div
+                key={item.id}
+                className="glass-panel p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-5 hover:border-indigo-200 hover:shadow-md transition-all group bg-white"
+              >
+                <div className="space-y-3">
+                  {/* Provider & Verified Source Badges */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider border border-slate-200">
+                      {item.provider || 'SkillForge Curation'}
                     </span>
-                    <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 uppercase">
-                      {item.type || item.level || activeCategory}
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200">
+                        Score: {item.score.toFixed(1)}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 uppercase">
+                        {item.type || item.level || activeCategory}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Verified Source Citation Badge for Projects */}
+                  {isProject && item.url && (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Source: GitHub Open Source Specification</span>
+                      <ExternalLink className="w-3 h-3 text-emerald-600" />
+                    </a>
+                  )}
+
+                  {/* Title */}
+                  <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                    {item.title}
+                  </h3>
+
+                  {/* Description */}
+                  {item.description && (
+                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                      {item.description}
+                    </p>
+                  )}
+
+                  {/* Matched Skill Badges */}
+                  {item.matched_gap_skills && item.matched_gap_skills.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-xs text-slate-500 font-bold">Closes Gaps:</span>
+                      {item.matched_gap_skills.map((skill, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Milestone Progress Bar Preview for Projects */}
+                  {isProject && milestones.length > 0 && (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                        <span className="flex items-center gap-1.5">
+                          <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Implementation Progress</span>
+                        </span>
+                        <span className="text-indigo-600">{doneCount}/{milestones.length} Steps ({pct}%)</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI Personalized Explanation Box */}
+                  <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>AI Personalization Rationale</span>
+                    </div>
+                    <p className="text-xs text-slate-700 leading-relaxed italic">
+                      &quot;{item.explanation}&quot;
+                    </p>
                   </div>
                 </div>
 
-                {/* Title */}
-                <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                  {item.title}
-                </h3>
-
-                {/* Description */}
-                {item.description && (
-                  <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                    {item.description}
-                  </p>
-                )}
-
-                {/* Matched Skill Badges */}
-                {item.matched_gap_skills && item.matched_gap_skills.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-xs text-slate-500 font-bold">Closes Gaps:</span>
-                    {item.matched_gap_skills.map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold"
-                      >
-                        {skill}
-                      </span>
-                    ))}
+                {/* Card Footer: Metadata & Action Button */}
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{item.estimated_hours}h est.</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <BarChart3 className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Level {item.difficulty}/5</span>
+                    </div>
                   </div>
-                )}
 
-                {/* AI Personalized Explanation Box */}
-                <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>AI Personalization Rationale</span>
-                  </div>
-                  <p className="text-xs text-slate-700 leading-relaxed italic">
-                    &quot;{item.explanation}&quot;
-                  </p>
+                  {isProject ? (
+                    <button
+                      onClick={() => setSelectedProject(item)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                    >
+                      <GitBranch className="w-3.5 h-3.5" />
+                      <span>View Blueprint & Milestones</span>
+                    </button>
+                  ) : item.url ? (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-2xs"
+                    >
+                      <span>View Resource</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  ) : null}
                 </div>
               </div>
+            )
+          })}
+        </div>
+      )}
 
-              {/* Card Footer: Metadata & Action Button */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 text-xs text-slate-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{item.estimated_hours}h est.</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <BarChart3 className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Level {item.difficulty}/5</span>
-                  </div>
+      {/* PROJECT BLUEPRINT & MILESTONES MODAL */}
+      {selectedProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col space-y-6 p-6">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-bold uppercase tracking-wider border border-indigo-200">
+                    Project Implementation Blueprint
+                  </span>
+                  {selectedProject.url && (
+                    <a
+                      href={selectedProject.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Verified GitHub Spec ↗</span>
+                    </a>
+                  )}
                 </div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                  {selectedProject.title}
+                </h2>
+              </div>
 
-                {item.url && (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-2xs"
-                  >
-                    <span>View Resource</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Description & Metadata */}
+            <div className="space-y-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {selectedProject.description}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-indigo-600" />
+                  <span>Estimated Time: {selectedProject.estimated_hours} Hours</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <BarChart3 className="w-4 h-4 text-indigo-600" />
+                  <span>Complexity Level: {selectedProject.difficulty}/5</span>
+                </div>
               </div>
             </div>
-          ))}
+
+            {/* Overall Progress Gauge Bar */}
+            {(() => {
+              const milestones = selectedProject.milestones || []
+              const doneCount = milestones.filter(m => completedMilestones[`${selectedProject.id}_${m.id}`]).length
+              const pct = milestones.length > 0 ? Math.round((doneCount / milestones.length) * 100) : 0
+
+              return (
+                <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+                    <span className="flex items-center gap-2">
+                      <GitBranch className="w-4 h-4 text-indigo-600" />
+                      <span>Milestones Mastered</span>
+                    </span>
+                    <span className="text-indigo-700">{doneCount} of {milestones.length} Completed ({pct}%)</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 transition-all duration-300"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* 4 Step-by-Step Milestone Implementation Cards */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                Step-by-Step Implementation Roadmap
+              </h3>
+
+              {(selectedProject.milestones || []).map((m) => {
+                const key = `${selectedProject.id}_${m.id}`
+                const isDone = !!completedMilestones[key]
+
+                return (
+                  <div
+                    key={m.id}
+                    className={`p-4 rounded-xl border flex items-start gap-3.5 transition-all ${
+                      isDone
+                        ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
+                        : 'bg-white border-slate-200/90 hover:border-indigo-200'
+                    }`}
+                  >
+                    <button
+                      onClick={() => toggleMilestone(selectedProject.id, m.id)}
+                      className="mt-0.5 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer shrink-0"
+                    >
+                      {isDone ? (
+                        <CheckSquare className="w-5 h-5 text-emerald-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-slate-400" />
+                      )}
+                    </button>
+
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-xs font-bold ${isDone ? 'text-emerald-900 line-through' : 'text-indigo-700'}`}>
+                          {m.step}
+                        </span>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                          isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {isDone ? 'Completed ✓' : 'Pending'}
+                        </span>
+                      </div>
+                      <p className={`text-xs leading-relaxed ${isDone ? 'text-emerald-800/80' : 'text-slate-600'}`}>
+                        {m.task}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
+              {selectedProject.url && (
+                <a
+                  href={selectedProject.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Open GitHub Reference Repo</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 ml-auto cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

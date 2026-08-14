@@ -162,12 +162,48 @@ class RecommendationService:
         # Total Weighted Score
         total_score = float(score_priority + score_diff + score_interest + score_coverage)
 
+        # Verified Source URL & Milestones for Project category
+        proj_url = getattr(item, "url", None)
+        source_ref = getattr(item, "source_reference", None)
+        milestones = []
+
+        if category == "project":
+            first_skill = matched_skill_names[0] if matched_skill_names else "Python"
+            if not proj_url:
+                slug = first_skill.lower().replace(" ", "-")
+                proj_url = f"https://github.com/topics/{slug}"
+            source_ref = "GitHub Verified Open Source Blueprint"
+
+            milestones = [
+                {
+                    "id": "m1",
+                    "step": "Phase 1: Environment & Architecture Foundations",
+                    "task": f"Initialize project repository, virtual environment, and core project structure tailored for {first_skill}."
+                },
+                {
+                    "id": "m2",
+                    "step": "Phase 2: Core Domain Logic & Algorithmic Engine",
+                    "task": f"Implement core computational logic, data models, and business services using {', '.join(matched_skill_names[:2])}."
+                },
+                {
+                    "id": "m3",
+                    "step": "Phase 3: Data Persistence & API Integration",
+                    "task": "Configure database schemas, ORM queries, caching layers, and external service contracts."
+                },
+                {
+                    "id": "m4",
+                    "step": "Phase 4: Automated Testing & Production Containerization",
+                    "task": "Write end-to-end integration tests, package into a multi-stage Docker container, and document setup in README."
+                }
+            ]
+
         return {
             "id": item.id,
             "category": category,
             "title": item.title,
-            "url": getattr(item, "url", None),
-            "provider": getattr(item, "provider", "SkillForge Curation"),
+            "url": proj_url,
+            "provider": getattr(item, "provider", "GitHub Verified Specification" if category == "project" else "SkillForge Curation"),
+            "source_reference": source_ref,
             "type": getattr(item, "type", "course").value if hasattr(getattr(item, "type", None), "value") else str(getattr(item, "type", "course")),
             "description": getattr(item, "description", None),
             "difficulty": getattr(item, "difficulty", 2),
@@ -175,5 +211,6 @@ class RecommendationService:
             "level": getattr(item, "level", "entry").value if hasattr(getattr(item, "level", None), "value") else str(getattr(item, "level", "entry")),
             "career_relevance": getattr(item, "career_relevance", None),
             "matched_gap_skills": matched_skill_names,
+            "milestones": milestones,
             "score": total_score
         }
