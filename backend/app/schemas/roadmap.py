@@ -13,6 +13,9 @@ class RoadmapItemResponse(BaseModel):
     ref_skill_id: Optional[str] = None
     ref_resource_id: Optional[str] = None
     ref_project_id: Optional[str] = None
+    ref_url: Optional[str] = None
+    ref_provider: Optional[str] = None
+    chapter_title: Optional[str] = None
     title: str
     order_index: int
     status: RoadmapItemStatus

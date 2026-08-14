@@ -71,6 +71,9 @@ class RoadmapItem(Base):
     ref_skill_id = Column(Integer, ForeignKey("skills.id", ondelete="SET NULL"), nullable=True)
     ref_resource_id = Column(String(36), nullable=True)
     ref_project_id = Column(String(36), nullable=True)
+    ref_url = Column(String(500), nullable=True)
+    ref_provider = Column(String(100), nullable=True)
+    chapter_title = Column(String(255), nullable=True)
     title = Column(String(255), nullable=False)
     order_index = Column(Integer, nullable=False)
     status = Column(

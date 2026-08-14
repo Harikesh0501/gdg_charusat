@@ -9,8 +9,20 @@ class InterviewRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_seed_questions(self, career_role_id: Optional[int] = None, skill_ids: Optional[List[int]] = None) -> List[InterviewQuestion]:
+    def get_attempted_question_ids(self, profile_id: str) -> List[str]:
+        attempts = self.db.query(InterviewAttempt.question_id).filter(InterviewAttempt.profile_id == profile_id).all()
+        return [a[0] for a in attempts]
+
+    def get_seed_questions(
+        self,
+        career_role_id: Optional[int] = None,
+        skill_ids: Optional[List[int]] = None,
+        exclude_ids: Optional[List[str]] = None
+    ) -> List[InterviewQuestion]:
         query = self.db.query(InterviewQuestion)
+
+        if exclude_ids:
+            query = query.filter(~InterviewQuestion.id.in_(exclude_ids))
 
         filters = []
         if career_role_id:
@@ -23,9 +35,12 @@ class InterviewRepository:
         if filters:
             results = query.filter(or_(*filters)).all()
 
-        # Fallback to all available questions if specific role/skill filter yields fewer than 3 questions
+        # Fallback to unattempted questions if specific role/skill filter yields fewer than 3 questions
         if not results or len(results) < 3:
-            results = self.db.query(InterviewQuestion).all()
+            q_fallback = self.db.query(InterviewQuestion)
+            if exclude_ids:
+                q_fallback = q_fallback.filter(~InterviewQuestion.id.in_(exclude_ids))
+            results = q_fallback.all()
 
         return results
 

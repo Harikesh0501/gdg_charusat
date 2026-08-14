@@ -103,21 +103,31 @@ class RoadmapService:
                 summary=summary
             )
 
-            # Add Items to Phase
+            # Add Items to Phase grouped by Chapter Subsections
             item_order = 1
             skills_in_phase = p_skel["skill_objects"]
+            chap_idx = 1
+
+            # Query available resources from catalog
+            from app.models.recommendation import Resource, Project
+            catalog_resources = self.db.query(Resource).all()
+            catalog_projects = self.db.query(Project).all()
+
             for skill_obj in skills_in_phase:
                 raw_s_id = skill_obj.get("skill_id", 1)
                 s_id_int = int(raw_s_id) if str(raw_s_id).isdigit() else raw_s_id
                 s_name = skill_obj.get("skill_name", skill_obj.get("name", f"Skill #{raw_s_id}"))
 
-                # Skill Item
+                chapter_title = f"Chapter {order_idx}.{chap_idx}: {s_name} Foundations & Hands-On Practice"
+
+                # 1. Interactive Skill Lesson Item
                 skill_item = RoadmapItem(
                     id=str(uuid.uuid4()),
                     phase_id=phase_id,
                     type=RoadmapItemType.SKILL,
                     ref_skill_id=s_id_int,
-                    title=f"Learn & Practice {s_name}",
+                    chapter_title=chapter_title,
+                    title=f"Core Lesson & Concept Practice: {s_name}",
                     order_index=item_order,
                     status=RoadmapItemStatus.NOT_STARTED,
                     estimated_hours=8
@@ -125,27 +135,45 @@ class RoadmapService:
                 phase.items.append(skill_item)
                 item_order += 1
 
-                # Attached Resource Placeholder Item
+                # 2. Attached Real Learning Resource Item
+                matched_res = next((r for r in catalog_resources if any(s.id == s_id_int for s in r.skills)), None)
+                res_url = matched_res.url if matched_res else f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
+                res_provider = matched_res.provider if matched_res else f"{s_name} Official Documentation"
+                res_title = matched_res.title if matched_res else f"{s_name} Official Guide & Documentation"
+
                 res_item = RoadmapItem(
                     id=str(uuid.uuid4()),
                     phase_id=phase_id,
                     type=RoadmapItemType.RESOURCE,
                     ref_skill_id=s_id_int,
-                    title=f"{s_name} Documentation & Core Concepts Guide",
+                    ref_url=res_url,
+                    ref_provider=res_provider,
+                    chapter_title=chapter_title,
+                    title=f"Study Resource: {res_title}",
                     order_index=item_order,
                     status=RoadmapItemStatus.NOT_STARTED,
                     estimated_hours=4
                 )
                 phase.items.append(res_item)
                 item_order += 1
+                chap_idx += 1
 
-            # Phase Milestone Item
+            # Phase Milestone / Capstone Chapter
+            capstone_chap = f"Chapter {order_idx}.{chap_idx}: Phase Milestone Capstone Project"
             phase_skill_names = [s.get("skill_name", s.get("name", "")) for s in skills_in_phase]
+            matched_proj = next((p for p in catalog_projects if any(s.id in [s_obj.get("skill_id") for s_obj in skills_in_phase] for s in p.skills)), None)
+
+            proj_title = matched_proj.title if matched_proj else f"Complete Capstone Project demonstrating {', '.join(phase_skill_names)}"
+            proj_desc = matched_proj.description if matched_proj else "Build a production-grade portfolio project."
+
             milestone_item = RoadmapItem(
                 id=str(uuid.uuid4()),
                 phase_id=phase_id,
                 type=RoadmapItemType.MILESTONE,
-                title=f"Phase Milestone: Complete project demonstrating {', '.join(phase_skill_names)}",
+                chapter_title=capstone_chap,
+                title=f"Phase Milestone: {proj_title}",
+                ref_provider="SkillForge Portfolio Project",
+                ref_url="https://github.com/",
                 order_index=item_order,
                 status=RoadmapItemStatus.NOT_STARTED,
                 estimated_hours=12

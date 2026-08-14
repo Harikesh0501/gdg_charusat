@@ -1,4 +1,5 @@
 import uuid
+import random
 import logging
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -27,7 +28,7 @@ class InterviewService:
     async def get_practice_questions(self, profile_id: str) -> Dict[str, Any]:
         """
         Retrieves a balanced set of 5 interview questions (Technical, Behavioral, Role-Specific, Project-Driven).
-        Guarantees that a non-empty set of questions is always returned for every user with string serialized IDs.
+        Excludes recently attempted questions, randomizes question sets, and dynamically generates role-tailored AI questions.
         """
         goal = self.career_repo.get_active_career_goal(profile_id)
         role_id = goal.career_role_id if goal else None
@@ -39,14 +40,26 @@ class InterviewService:
             gaps = gap_report.get("gaps", [])
             gap_skill_ids = [g["skill_id"] for g in gaps]
 
-        # 1. Fetch Candidate Questions from Seed / DB
-        # 1. Fetch Candidate Questions from Seed / DB strictly filtered by active target role
-        all_questions = self.interview_repo.get_seed_questions(career_role_id=role_id, skill_ids=gap_skill_ids)
+        # 1. Fetch Attempted Question IDs to prevent repeating questions
+        attempted_ids = self.interview_repo.get_attempted_question_ids(profile_id)
+
+        # 2. Fetch Candidate Questions from Seed / DB filtered by role & excluding attempted
+        all_questions = self.interview_repo.get_seed_questions(
+            career_role_id=role_id,
+            skill_ids=gap_skill_ids,
+            exclude_ids=attempted_ids
+        )
 
         tech_qs = [q for q in all_questions if q.category == QuestionCategory.TECHNICAL]
         behav_qs = [q for q in all_questions if q.category == QuestionCategory.BEHAVIORAL]
         role_qs = [q for q in all_questions if q.category == QuestionCategory.ROLE_SPECIFIC]
         proj_qs = [q for q in all_questions if q.category == QuestionCategory.PROJECT_SPECIFIC]
+
+        # Randomize candidates so every click on "New Session Kit" is fresh
+        random.shuffle(tech_qs)
+        random.shuffle(behav_qs)
+        random.shuffle(role_qs)
+        random.shuffle(proj_qs)
 
         selected_questions = []
 
@@ -60,10 +73,14 @@ class InterviewService:
         if proj_qs:
             selected_questions.extend(proj_qs[:1])
 
-        # 2. Always generate Project-Driven Questions from candidate's resume projects via AI
+        # 3. Always generate Project-Driven Questions from candidate's resume projects via AI
         user_projects = self.resume_repo.get_profile_projects(profile_id)
         if user_projects and len(selected_questions) < 5:
-            proj_dicts = [{"title": p.title, "description": p.description} for p in user_projects[:3]]
+            # Rotate projects randomly
+            project_pool = list(user_projects)
+            random.shuffle(project_pool)
+            proj_dicts = [{"title": p.title, "description": p.description} for p in project_pool[:3]]
+
             needed_count = min(2, 5 - len(selected_questions))
             if needed_count > 0:
                 ai_proj_qs = await self.ai_extractor.generate_project_questions(
@@ -87,8 +104,9 @@ class InterviewService:
                     saved_q = self.interview_repo.save_question(saved_q)
                     selected_questions.append(saved_q)
 
-        # Fill remaining slots from all_questions matching role if still under 5
+        # 4. Fill remaining slots with randomized unattempted candidates
         selected_ids = {str(q.id) for q in selected_questions}
+        random.shuffle(all_questions)
         for q in all_questions:
             if len(selected_questions) >= 5:
                 break
@@ -96,9 +114,10 @@ class InterviewService:
                 selected_questions.append(q)
                 selected_ids.add(str(q.id))
 
-        # Fail-safe: if still under 5, fetch available questions in system
+        # 5. Fail-safe: if still under 5, fetch any questions in system
         if len(selected_questions) < 5:
             fallback_qs = self.db.query(InterviewQuestion).all()
+            random.shuffle(fallback_qs)
             for fq in fallback_qs:
                 if len(selected_questions) >= 5:
                     break

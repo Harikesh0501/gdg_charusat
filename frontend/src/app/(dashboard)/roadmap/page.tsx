@@ -24,6 +24,7 @@ import {
   ArrowRight,
   UploadCloud,
   FileText,
+  ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -42,6 +43,9 @@ interface RoadmapItem {
   ref_skill_id?: string
   ref_resource_id?: string
   ref_project_id?: string
+  ref_url?: string
+  ref_provider?: string
+  chapter_title?: string
   title: string
   order_index: number
   status: 'not_started' | 'in_progress' | 'completed'
@@ -533,66 +537,142 @@ export default function LearningRoadmapPage() {
                     </div>
                   </div>
 
-                  {/* Expanded Items List */}
+                  {/* Expanded Items List grouped by Chapters */}
                   {isExpanded && (
-                    <div className="px-5 pb-5 pt-2 border-t border-slate-100 space-y-2 bg-slate-50/40">
-                      {phase.items.map((item) => {
-                        const isDone = item.status === 'completed'
-                        const isUpdating = updatingItemId === item.id
+                    <div className="px-5 pb-6 pt-3 border-t border-slate-100 space-y-6 bg-slate-50/50">
+                      {(() => {
+                        // Group items by chapter_title
+                        const chapterMap = new Map<string, RoadmapItem[]>()
+                        phase.items.forEach((item) => {
+                          const cTitle = item.chapter_title || `Chapter ${phase.order_index}.1: Core Learning Objectives`
+                          if (!chapterMap.has(cTitle)) {
+                            chapterMap.set(cTitle, [])
+                          }
+                          chapterMap.get(cTitle)!.push(item)
+                        })
 
-                        return (
-                          <div
-                            key={item.id}
-                            className={`p-3.5 rounded-xl border flex items-start justify-between gap-3 transition-all ${
-                              isDone
-                                ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
-                                : 'bg-white border-slate-200/80 hover:border-indigo-200 text-slate-800'
-                            }`}
-                          >
-                            <div className="flex items-start gap-3 flex-1">
-                              <button
-                                onClick={() => toggleItemStatus(item.id, item.status)}
-                                disabled={isUpdating}
-                                className="mt-0.5 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
-                              >
-                                {isUpdating ? (
-                                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                                ) : isDone ? (
-                                  <CheckSquare className="w-4 h-4 text-emerald-600" />
-                                ) : (
-                                  <Square className="w-4 h-4 text-slate-400" />
-                                )}
-                              </button>
+                        return Array.from(chapterMap.entries()).map(([chapterTitle, chapterItems]) => {
+                          const chapCompleted = chapterItems.filter((i) => i.status === 'completed').length
+                          const chapPct = chapterItems.length > 0 ? Math.round((chapCompleted / chapterItems.length) * 100) : 0
 
-                              <div>
-                                <p className={`text-xs font-bold ${isDone ? 'line-through text-emerald-800' : 'text-slate-900'}`}>
-                                  {item.title}
-                                </p>
+                          return (
+                            <div
+                              key={chapterTitle}
+                              className="rounded-xl border border-slate-200/90 bg-white p-4 space-y-3 shadow-2xs"
+                            >
+                              {/* Chapter Sub-header */}
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                                <div className="flex items-center gap-2">
+                                  <BookOpen className="w-4 h-4 text-indigo-600" />
+                                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                                    {chapterTitle}
+                                  </h4>
+                                </div>
 
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                                    {item.type}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-slate-400" /> {item.estimated_hours}h estimated
-                                  </span>
+                                <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+                                  <span>{chapCompleted}/{chapterItems.length} Lessons</span>
+                                  <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                    <div
+                                      className="h-full bg-emerald-500 transition-all duration-300"
+                                      style={{ width: `${chapPct}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            <button
-                              onClick={() => toggleItemStatus(item.id, item.status)}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                                isDone
-                                  ? 'bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200'
-                                  : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                              }`}
-                            >
-                              {isDone ? 'Done ✓' : 'Mark Done'}
-                            </button>
-                          </div>
-                        )
-                      })}
+                              {/* Lessons & Resource Cards inside Chapter */}
+                              <div className="space-y-2.5">
+                                {chapterItems.map((item) => {
+                                  const isDone = item.status === 'completed'
+                                  const isUpdating = updatingItemId === item.id
+
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className={`p-3.5 rounded-xl border flex items-start justify-between gap-3 transition-all ${
+                                        isDone
+                                          ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
+                                          : item.type === 'resource'
+                                          ? 'bg-indigo-50/30 border-indigo-100 hover:border-indigo-300'
+                                          : item.type === 'milestone'
+                                          ? 'bg-amber-50/30 border-amber-200'
+                                          : 'bg-slate-50/60 border-slate-200/80 hover:border-indigo-200 text-slate-800'
+                                      }`}
+                                    >
+                                      <div className="flex items-start gap-3 flex-1">
+                                        <button
+                                          onClick={() => toggleItemStatus(item.id, item.status)}
+                                          disabled={isUpdating}
+                                          className="mt-0.5 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                                        >
+                                          {isUpdating ? (
+                                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                                          ) : isDone ? (
+                                            <CheckSquare className="w-4 h-4 text-emerald-600" />
+                                          ) : (
+                                            <Square className="w-4 h-4 text-slate-400" />
+                                          )}
+                                        </button>
+
+                                        <div className="space-y-1">
+                                          <div className="flex items-center gap-2">
+                                            <p className={`text-xs font-bold ${isDone ? 'line-through text-emerald-800' : 'text-slate-900'}`}>
+                                              {item.title}
+                                            </p>
+                                          </div>
+
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                              {item.type}
+                                            </span>
+
+                                            {item.ref_provider && (
+                                              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                {item.ref_provider}
+                                              </span>
+                                            )}
+
+                                            <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1">
+                                              <Clock className="w-3 h-3 text-slate-400" /> {item.estimated_hours}h estimated
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        {item.ref_url && (
+                                          <a
+                                            href={item.ref_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 text-indigo-600 text-xs font-bold transition-all shadow-2xs inline-flex items-center gap-1.5 hover:bg-indigo-50"
+                                            title="Open Resource"
+                                          >
+                                            <BookOpen className="w-3.5 h-3.5" />
+                                            <span className="hidden sm:inline">Open Resource</span>
+                                            <ExternalLink className="w-3 h-3 text-indigo-500" />
+                                          </a>
+                                        )}
+
+                                        <button
+                                          onClick={() => toggleItemStatus(item.id, item.status)}
+                                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                            isDone
+                                              ? 'bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200'
+                                              : 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 shadow-2xs'
+                                          }`}
+                                        >
+                                          {isDone ? 'Done ✓' : 'Mark Done'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })
+                      })()}
                     </div>
                   )}
                 </div>
