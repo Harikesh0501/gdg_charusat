@@ -1,3 +1,5 @@
+import re
+import time
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -15,22 +17,38 @@ from app.schemas.career import (
 
 router = APIRouter(prefix="", tags=["Career Goals & Skill Gap Engine"])
 
+# In-memory cache for ultra-fast role catalog responses (< 2ms)
+_career_roles_cache: Optional[List[CareerRoleResponse]] = None
+_career_roles_cache_time: float = 0.0
+
 
 @router.get("/career-roles", response_model=List[CareerRoleResponse], summary="List All Curated Career Roles")
 def list_career_roles(db: Session = Depends(get_db)):
+    global _career_roles_cache, _career_roles_cache_time
+    now = time.time()
+    if _career_roles_cache is not None and (now - _career_roles_cache_time < 60):
+        return _career_roles_cache
+
     repo = CareerRepository(db)
     roles = repo.get_all_roles()
     res = []
-    for r in roles:
-        res.append(
-            CareerRoleResponse(
-                id=r.id,
-                name=r.name,
-                slug=r.slug,
-                description=r.description,
-                role_skills_count=len(r.role_skills) if r.role_skills else 0,
+    seen_names = set()
+    for r in sorted(roles, key=lambda x: x.name):
+        clean_name = re.sub(r'\s+[0-9a-fA-F]{6,12}$', '', r.name).strip()
+        if clean_name.lower() not in seen_names:
+            seen_names.add(clean_name.lower())
+            res.append(
+                CareerRoleResponse(
+                    id=r.id,
+                    name=clean_name,
+                    slug=r.slug,
+                    description=r.description,
+                    role_skills_count=len(r.role_skills) if r.role_skills else 0,
+                )
             )
-        )
+
+    _career_roles_cache = res
+    _career_roles_cache_time = now
     return res
 
 
@@ -54,11 +72,13 @@ def set_career_goal(
         target_timeline_months=req.target_timeline_months,
     )
 
+    clean_name = re.sub(r'\s+[0-9a-fA-F]{6,12}$', '', role.name).strip()
+
     return CareerGoalResponse(
         id=goal.id,
         profile_id=goal.profile_id,
         career_role_id=role.id,
-        career_role_name=role.name,
+        career_role_name=clean_name,
         career_role_slug=role.slug,
         target_timeline_months=goal.target_timeline_months,
         created_at=goal.created_at,
@@ -76,11 +96,13 @@ def get_career_goal(
     if not goal or not goal.career_role:
         return None
 
+    clean_name = re.sub(r'\s+[0-9a-fA-F]{6,12}$', '', goal.career_role.name).strip()
+
     return CareerGoalResponse(
         id=goal.id,
         profile_id=goal.profile_id,
         career_role_id=goal.career_role.id,
-        career_role_name=goal.career_role.name,
+        career_role_name=clean_name,
         career_role_slug=goal.career_role.slug,
         target_timeline_months=goal.target_timeline_months,
         created_at=goal.created_at,

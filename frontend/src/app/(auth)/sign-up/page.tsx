@@ -1,29 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Sparkles, Mail, Lock, AlertCircle, Loader2, CheckCircle2, MailCheck } from 'lucide-react'
+import Image from 'next/image'
+import { AlertCircle, Loader2, X, Eye, EyeOff, CheckCircle2, ArrowRight, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SignUpPage() {
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<'idle' | 'confirming' | 'redirecting'>('idle')
+  
   const router = useRouter()
   const supabase = createClient()
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await (supabase.auth as any).getSession()
-      if (data?.session) {
-        router.push('/dashboard')
-      }
-    }
-    checkSession()
-  }, [router])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +28,11 @@ export default function SignUpPage() {
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
       })
 
       if (authError) {
@@ -43,22 +42,21 @@ export default function SignUpPage() {
       }
 
       if (data.session) {
-        // Email confirmation is disabled — user is immediately signed in
         setStatus('redirecting')
 
-        // Sync user with backend
         const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
-        await fetch(`${backendUrl}/api/auth/sync`, {
+        fetch(`${backendUrl}/api/auth/sync`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${data.session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }).catch(err => console.warn('Sync call failed:', err))
+        }).catch(err => console.warn('Sync call note:', err))
 
-        setTimeout(() => router.push('/dashboard'), 1500)
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 1500)
       } else {
-        // Email confirmation is required — user must verify email first
         setStatus('confirming')
         setLoading(false)
       }
@@ -69,98 +67,151 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md glass-panel p-8 rounded-2xl border border-white/10 shadow-2xl">
-        <div className="text-center mb-8">
-          <div className="inline-flex p-3 rounded-full bg-primary/10 text-primary mb-3">
-            <Sparkles className="w-6 h-6" />
+    <div className="h-screen w-screen overflow-hidden flex items-center justify-center p-4 sm:p-8 bg-slate-50 relative">
+      <div className="w-full max-w-6xl h-full max-h-[680px] bg-white rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 relative overflow-hidden">
+        
+        {/* Left Column: Auth Form Area (7 Cols) */}
+        <div className="lg:col-span-7 flex flex-col justify-between p-4 sm:p-6 h-full overflow-y-auto">
+          {/* Top Brand Logo */}
+          <div className="flex items-center justify-between">
+            <Link
+              href="/"
+              className="flex items-center gap-2 font-black text-lg tracking-tight text-slate-900"
+            >
+              <div className="p-1.5 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
+                <Zap className="w-4 h-4 fill-current" />
+              </div>
+              <span>SkillForge <span className="text-indigo-600">AI</span></span>
+            </Link>
           </div>
-          <h2 className="text-2xl font-bold text-white">Create Your Account</h2>
-          <p className="text-sm text-slate-400 mt-1">Join SkillForge AI and build your career roadmap</p>
-        </div>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-red-400 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {status === 'redirecting' && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3 text-emerald-400 text-sm">
-            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>Account created successfully! Redirecting to dashboard...</span>
-          </div>
-        )}
-
-        {status === 'confirming' && (
-          <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 text-amber-300 text-sm">
-            <MailCheck className="w-5 h-5 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold">Check your email</p>
-              <p className="text-xs text-amber-300/80 mt-1">
-                We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account, then{' '}
-                <Link href="/sign-in" className="underline font-medium">sign in</Link>.
+          {/* Form Content */}
+          <div className="max-w-md w-full mx-auto my-auto py-2 space-y-4">
+            <div className="text-left space-y-1">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">Create Student Account</h1>
+              <p className="text-xs text-slate-500 font-medium">
+                Sign up and build your personalized career roadmap
               </p>
             </div>
+
+            {error && (
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800 text-xs font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {status === 'redirecting' && (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-800 text-xs font-bold">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <span>Account created! Redirecting to dashboard...</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSignUp} className="space-y-3.5 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Alex Mercer"
+                  disabled={status !== 'idle'}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="student@example.com"
+                  disabled={status !== 'idle'}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="•••••••• (min 6 characters)"
+                    disabled={status !== 'idle'}
+                    className="w-full pl-4 pr-12 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {status === 'idle' && (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all disabled:opacity-50 mt-3 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <span>Create Free Account</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              )}
+            </form>
           </div>
-        )}
 
-        <form onSubmit={handleSignUp} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-1.5">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-5 h-5 absolute left-3.5 top-3 text-slate-500" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="student@example.com"
-                disabled={status !== 'idle'}
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm disabled:opacity-50"
-              />
-            </div>
+          {/* Bottom Footer Links */}
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 font-medium">
+            <span>
+              Already have an account?{' '}
+              <Link href="/sign-in" className="text-indigo-600 font-bold hover:underline">
+                Sign In
+              </Link>
+            </span>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-1.5">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="w-5 h-5 absolute left-3.5 top-3 text-slate-500" />
-              <input
-                type="password"
-                required
-                value={password}
-                minLength={6}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="•••••••• (min 6 characters)"
-                disabled={status !== 'idle'}
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm disabled:opacity-50"
-              />
-            </div>
-          </div>
+        {/* Right Column: Visual Lifestyle Photo (5 Cols) */}
+        <div className="lg:col-span-5 hidden lg:block relative rounded-2xl overflow-hidden border border-slate-200 shadow-lg h-full">
+          <Image
+            src="/auth_lifestyle.png"
+            alt="SkillForge Team Collaboration"
+            fill
+            className="object-cover"
+          />
 
-          {status === 'idle' && (
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all disabled:opacity-50 mt-6"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
-            </button>
-          )}
-        </form>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Already have an account?{' '}
-          <Link href="/sign-in" className="text-primary font-medium hover:underline">
-            Sign In
+          {/* Top Right Close Button */}
+          <Link
+            href="/"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/90 hover:bg-white text-slate-700 shadow-md backdrop-blur-md transition-transform hover:scale-105 z-20"
+          >
+            <X className="w-4 h-4" />
           </Link>
-        </p>
+        </div>
+
       </div>
     </div>
   )

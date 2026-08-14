@@ -124,3 +124,6 @@ class ResumeRepository:
         self.db.commit()
         self.db.refresh(project)
         return project
+
+    def get_profile_projects(self, profile_id: uuid.UUID) -> List[ProfileProject]:
+        return self.db.query(ProfileProject).filter(ProfileProject.profile_id == profile_id).all()

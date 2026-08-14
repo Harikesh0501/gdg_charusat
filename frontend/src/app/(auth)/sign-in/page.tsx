@@ -1,28 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Sparkles, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import { AlertCircle, Loader2, X, Eye, EyeOff, ArrowRight, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SignInPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
   const router = useRouter()
   const supabase = createClient()
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await (supabase.auth as any).getSession()
-      if (data?.session) {
-        router.push('/dashboard')
-      }
-    }
-    checkSession()
-  }, [router])
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,19 +34,20 @@ export default function SignInPage() {
         return
       }
 
-      // Sync user with backend
       if (data.session) {
+        // Fire sync call asynchronously in background
         const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
-        await fetch(`${backendUrl}/api/auth/sync`, {
+        fetch(`${backendUrl}/api/auth/sync`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${data.session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }).catch(err => console.warn('Sync call failed:', err))
-      }
+        }).catch(err => console.warn('Sync call note:', err))
 
-      router.push('/dashboard')
+        // Direct instant redirect straight to inner dashboard
+        window.location.href = '/dashboard'
+      }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred')
       setLoading(false)
@@ -61,73 +55,124 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md glass-panel p-8 rounded-2xl border border-white/10 shadow-2xl">
-        <div className="text-center mb-8">
-          <div className="inline-flex p-3 rounded-full bg-primary/10 text-primary mb-3">
-            <Sparkles className="w-6 h-6" />
+    <div className="h-screen w-screen overflow-hidden flex items-center justify-center p-4 sm:p-8 bg-slate-50 relative">
+      <div className="w-full max-w-6xl h-full max-h-[680px] bg-white rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 relative overflow-hidden">
+        
+        {/* Left Column: Auth Form Area (7 Cols) */}
+        <div className="lg:col-span-7 flex flex-col justify-between p-4 sm:p-6 h-full overflow-y-auto">
+          {/* Top Brand Logo */}
+          <div className="flex items-center justify-between">
+            <Link
+              href="/"
+              className="flex items-center gap-2 font-black text-lg tracking-tight text-slate-900"
+            >
+              <div className="p-1.5 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
+                <Zap className="w-4 h-4 fill-current" />
+              </div>
+              <span>SkillForge <span className="text-indigo-600">AI</span></span>
+            </Link>
           </div>
-          <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
-          <p className="text-sm text-slate-400 mt-1">Sign in to continue your skill roadmap</p>
+
+          {/* Form Content */}
+          <div className="max-w-md w-full mx-auto my-auto py-4 space-y-6">
+            <div className="text-left space-y-1">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">Sign In to Dashboard</h1>
+              <p className="text-xs text-slate-500 font-medium">
+                Enter your credentials to access your account
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800 text-xs font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSignIn} className="space-y-4 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="student@example.com"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-4 pr-12 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all disabled:opacity-50 mt-4 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <span>Sign In to Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Bottom Footer Links */}
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 font-medium">
+            <span>
+              Don&apos;t have an account yet?{' '}
+              <Link href="/sign-up" className="text-indigo-600 font-bold hover:underline">
+                Create Free Account
+              </Link>
+            </span>
+          </div>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-red-400 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Right Column: Visual Lifestyle Photo (5 Cols) */}
+        <div className="lg:col-span-5 hidden lg:block relative rounded-2xl overflow-hidden border border-slate-200 shadow-lg h-full">
+          <Image
+            src="/auth_lifestyle.png"
+            alt="SkillForge Team Collaboration"
+            fill
+            className="object-cover"
+          />
 
-        <form onSubmit={handleSignIn} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-1.5">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-5 h-5 absolute left-3.5 top-3 text-slate-500" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="student@example.com"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-1.5">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="w-5 h-5 absolute left-3.5 top-3 text-slate-500" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary transition-all text-sm"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all disabled:opacity-50 mt-6"
+          {/* Top Right Close Button */}
+          <Link
+            href="/"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/90 hover:bg-white text-slate-700 shadow-md backdrop-blur-md transition-transform hover:scale-105 z-20"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
-          </button>
-        </form>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Don&apos;t have an account?{' '}
-          <Link href="/sign-up" className="text-primary font-medium hover:underline">
-            Sign Up
+            <X className="w-4 h-4" />
           </Link>
-        </p>
+        </div>
+
       </div>
     </div>
   )

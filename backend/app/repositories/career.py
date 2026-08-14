@@ -9,7 +9,13 @@ class CareerRepository:
         self.db = db
 
     def get_all_roles(self) -> List[CareerRole]:
-        return self.db.query(CareerRole).options(joinedload(CareerRole.role_skills)).all()
+        return (
+            self.db.query(CareerRole)
+            .options(joinedload(CareerRole.role_skills))
+            .filter(~CareerRole.name.like("Test Role%"))
+            .order_by(CareerRole.id.asc())
+            .all()
+        )
 
     def get_role_by_id(self, role_id: int) -> Optional[CareerRole]:
         return (

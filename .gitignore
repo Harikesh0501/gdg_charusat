@@ -25,3 +25,5 @@ __pycache__/
 # System & OS
 .DS_Store
 Thumbs.db
+*.db
+*.tsbuildinfo

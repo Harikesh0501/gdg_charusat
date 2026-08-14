@@ -12,7 +12,7 @@ This file is a persistent memory layer for AI coding agents working on SkillForg
 
 ## Engineering Rules Learned During Implementation
 
-*(Empty at project start — this section fills in as implementation proceeds. Do not delete this heading; add bullet entries under it as lessons are learned, each with enough context that a future agent understands why the rule exists, not just what it is.)*
+- **2026-08-14 — PostgreSQL Auto-Increment Sequence Synchronization**: When seeding records with integer primary keys (`id`), PostgreSQL auto-increment sequences (`skills_id_seq`, `career_roles_id_seq`, etc.) must be explicitly updated using `SELECT setval('seq_name', (SELECT MAX(id) FROM table))` to avoid `UniqueViolation: duplicate key value violates unique constraint` when subsequent `INSERT` statements execute.
 
 ## Rejected Approaches
 
@@ -253,8 +253,62 @@ The default `GROQ_MODEL` string in config/env was set to `meta-llama/llama-4-sco
 - `uv run pytest`: **9 passed (100%) in 18.13s**.
 - `bun run build`: Next.js 14 production build compiled successfully (`✓ Generating static pages (12/12)`).
 
+### 2026-08-13 — Phase 5: Personalized Learning Roadmap Engine & UI
 
+**Task**: Implement deterministic topological prerequisite-sorted learning roadmap generator, Groq AI Llama 3.3 70B narrative layer with fallback, API endpoints, unit tests, and interactive Next.js command center.
 
+**Implementation**:
+- **ORM & Database**: Built `app/models/roadmap.py` (`Roadmap`, `RoadmapPhase`, `RoadmapItem`, `RoadmapStatus`, `RoadmapItemType`, `RoadmapItemStatus`), `app/models/__init__.py`, and `alembic/versions/0004_roadmap_tables.py` migration.
+- **Topological Sorting Engine**: Built `app/services/roadmap.py` (`RoadmapService`) implementing Kahn's DAG algorithm to sequence prerequisite skills before target skills, adaptive phase chunking (1, 2, or 3 phases), item assembly (`skill`, `resource`, `milestone`), and repository persistence.
+- **AI Narrative Layer**: Built `app/ai/schemas/roadmap_narrative.py`, `app/ai/prompts/roadmap_prompts.py`, and `app/ai/extractors/roadmap_narrative.py` with Groq Llama 3.3 70B (`llama-3.3-70b-versatile`) and deterministic fallback text.
+- **Schemas & API**: Built `app/repositories/roadmap.py`, `app/schemas/roadmap.py`, and `app/api/roadmap.py` (`GET /api/roadmap`, `POST /api/roadmap/generate`, `PATCH /api/roadmap/items/{item_id}`). Mounted in `app/main.py`.
+- **Unit Tests**: Built `tests/test_roadmap.py` testing prerequisite topological ordering, item status updates, and DB persistence.
+- **Frontend Command Center**: Built interactive Next.js UI in `frontend/src/app/(dashboard)/roadmap/page.tsx` featuring career role selector, Groq AI strategy callout, phase accordions, progress tracker, and live item status toggling.
 
+**Files Changed**: `backend/app/models/roadmap.py`, `backend/app/models/__init__.py`, `backend/alembic/versions/0004_roadmap_tables.py`, `backend/alembic/versions/0001_initial_users_and_profiles.py`, `backend/alembic/versions/0002_resume_processing_and_skills.py`, `backend/alembic/versions/0003_career_roles_and_goals.py`, `backend/app/ai/schemas/roadmap_narrative.py`, `backend/app/ai/prompts/roadmap_prompts.py`, `backend/app/ai/extractors/roadmap_narrative.py`, `backend/app/repositories/roadmap.py`, `backend/app/services/roadmap.py`, `backend/app/schemas/roadmap.py`, `backend/app/api/roadmap.py`, `backend/app/main.py`, `backend/tests/test_roadmap.py`, `frontend/src/app/(dashboard)/roadmap/page.tsx`, `workdone.md`.
 
+**Verification**:
+- `uv run alembic upgrade head`: Applied `0004_roadmap` migration cleanly.
+- `uv run pytest`: **10 passed (100%) in 0.18s**.
+- `bun run build`: Next.js 14 production build compiled successfully (`✓ Generating static pages (12/12)`).
 
+### 2026-08-14 — Phase 6: Recommendation Engine (Resources, Projects, Certifications)
+
+**Task**: Implement candidate retrieval & deterministic weighted scoring recommendation engine, curated content seeding script, Groq AI Llama 3.3 70B explanation layer with fallback, API endpoints, unit tests, and interactive Next.js command center.
+
+**Implementation**:
+- **ORM & Database**: Built `app/models/recommendation.py` (`Resource`, `Project`, `Certification`, `RecommendationLog`, join tables `resource_skills`, `project_skills`, `certification_skills`), `app/models/__init__.py`, and `alembic/versions/0005_recommendations_tables.py` migration applied to Supabase PostgreSQL.
+- **Curated Content Seeding**: Built `seed/resources_and_projects.py` seeding 16 learning resources, 5 hands-on projects, and 3 industry certifications pre-tagged to target skill taxonomy.
+- **Scoring Engine**: Built `app/services/recommendations.py` (`RecommendationService`) implementing formula $\text{Score} = 3 \times \text{gap\_priority} + 2 \times \text{difficulty\_fit} + 1 \times \text{interest\_match} + 1 \times \text{skill\_coverage}$.
+- **Groq AI Explanation Layer**: Built `app/ai/schemas/recommendation_explanation.py`, `app/ai/prompts/recommendation_prompts.py`, and `app/ai/extractors/recommendation_explanation.py` with Groq Llama 3.3 70B (`llama-3.3-70b-versatile`) and deterministic fallback text.
+- **Schemas & API**: Built `app/repositories/recommendation.py`, `app/schemas/recommendation.py`, and `app/api/recommendations.py` (`GET /api/recommendations?category=resource|project|certification`). Mounted in `app/main.py`.
+- **Unit Tests**: Built `tests/test_recommendations.py` testing candidate retrieval filtering by gap skills, scoring math, and AI explanation fallback.
+- **Frontend Command Center**: Built interactive Next.js UI in `frontend/src/app/(dashboard)/recommendations/page.tsx` with category tabs (`Courses & Docs`, `Hands-On Projects`, `Certifications`), skill gap badges, score indicators, external resource links, and Groq AI explanation callout boxes.
+
+**Files Changed**: `backend/app/models/recommendation.py`, `backend/app/models/__init__.py`, `backend/alembic/versions/0005_recommendations_tables.py`, `seed/resources_and_projects.py`, `backend/app/ai/schemas/recommendation_explanation.py`, `backend/app/ai/prompts/recommendation_prompts.py`, `backend/app/ai/extractors/recommendation_explanation.py`, `backend/app/repositories/recommendation.py`, `backend/app/services/recommendations.py`, `backend/app/schemas/recommendation.py`, `backend/app/api/recommendations.py`, `backend/app/main.py`, `backend/tests/test_recommendations.py`, `frontend/src/app/(dashboard)/recommendations/page.tsx`, `workdone.md`.
+
+**Verification**:
+- `uv run alembic upgrade head`: Applied `0005_recommendations` migration cleanly.
+- `python seed/resources_and_projects.py`: Seeded resources, projects, and certifications into Supabase.
+- `uv run pytest`: **11 passed (100%) in 10.91s**.
+- `npx tsc --noEmit`: 0 TypeScript errors.
+
+### 2026-08-14 — Phase 7: Mock Interview Preparation Engine & AI Assessment
+
+**Task**: Implement mock interview question retrieval/generation engine, seeded questions dataset, Groq AI Llama 3.3 70B answer evaluator, API endpoints, unit tests, and interactive Next.js Mock Interview Command Center.
+
+**Implementation**:
+- **ORM & Database**: Built `app/models/interview.py` (`InterviewQuestion`, `InterviewAttempt`, `QuestionCategory`, `QuestionSource`), `app/models/__init__.py`, and `alembic/versions/0006_interview_tables.py` migration applied to Supabase PostgreSQL.
+- **Seeded Questions**: Built `seed/interview_questions.py` seeding 11+ structured technical, behavioral, and role-specific interview questions with ideal evaluation grounding points.
+- **Groq AI Extractor**: Built `app/ai/schemas/interview.py`, `app/ai/prompts/interview_prompts.py`, and `app/ai/extractors/interview.py` supporting resume project-driven question generation and answer evaluation against ideal criteria (score 0-100, key strengths, missed concepts, actionable feedback).
+- **Service & API**: Built `app/repositories/interview.py`, `app/services/interview.py`, `app/schemas/interview.py`, and `app/api/interview.py` (`GET /api/interview/questions`, `POST /api/interview/attempts`, `GET /api/interview/history`). Mounted in `app/main.py`.
+- **Unit Tests**: Built `tests/test_interview.py` verifying question balancing, answer evaluation, score calculation, attempt history tracking, and PostgreSQL sequence synchronization.
+- **Frontend Command Center**: Built interactive Next.js UI in `frontend/src/app/(dashboard)/interview/page.tsx` featuring category badges, word-count response editor, real-time Groq AI evaluation modal (score gauge, green strengths, amber growth points, feedback text), and performance history tab.
+
+**Files Changed**: `backend/app/models/interview.py`, `backend/app/models/__init__.py`, `backend/alembic/versions/0006_interview_tables.py`, `seed/interview_questions.py`, `backend/app/ai/schemas/interview.py`, `backend/app/ai/prompts/interview_prompts.py`, `backend/app/ai/extractors/interview.py`, `backend/app/repositories/interview.py`, `backend/app/services/interview.py`, `backend/app/schemas/interview.py`, `backend/app/api/interview.py`, `backend/app/main.py`, `backend/tests/test_interview.py`, `frontend/src/app/(dashboard)/interview/page.tsx`, `workdone.md`.
+
+**Verification**:
+- `uv run alembic upgrade head`: Applied `0006_interview` migration cleanly.
+- `python seed/interview_questions.py`: Seeded 11 questions into Supabase.
+- `uv run pytest`: **12 passed (100%) in 95.72s**.
+- `npx tsc --noEmit`: 0 TypeScript errors.

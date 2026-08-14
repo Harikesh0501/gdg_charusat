@@ -61,36 +61,42 @@ class GroqProvider(LLMProvider):
         ]
 
         last_error = None
-        # Key rotation loop
+        candidate_models = [self.model, "llama-3.1-8b-instant"]
+        # Deduplicate models while keeping order
+        seen_m = set()
+        models = [m for m in candidate_models if m and not (m in seen_m or seen_m.add(m))]
+
+        # Key rotation & model fallback loop
         for key_index, key in enumerate(self.api_keys):
-            try:
-                client = self._get_client(key)
-                for attempt in range(max_retries + 1):
-                    try:
-                        response = await client.chat.completions.create(
-                            messages=messages,
-                            model=self.model,
-                            response_format={"type": "json_object"},
-                            temperature=0.2,
-                        )
-
-                        raw_json = response.choices[0].message.content
-                        parsed = json.loads(raw_json)
-                        return schema.model_validate(parsed)
-
-                    except (ValidationError, json.JSONDecodeError) as e:
-                        last_error = e
-                        logger.warning(f"Groq structured generation attempt {attempt + 1} failed: {e}")
-                        if attempt < max_retries:
-                            messages.append(
-                                {
-                                    "role": "user",
-                                    "content": f"Your previous response failed validation: {e}. Output ONLY valid JSON matching the schema.",
-                                }
+            client = self._get_client(key)
+            for target_model in models:
+                try:
+                    for attempt in range(max_retries + 1):
+                        try:
+                            response = await client.chat.completions.create(
+                                messages=messages,
+                                model=target_model,
+                                response_format={"type": "json_object"},
+                                temperature=0.2,
                             )
 
-            except Exception as api_err:
-                last_error = api_err
-                logger.warning(f"Groq API key {key_index + 1}/{len(self.api_keys)} failed: {api_err}. Rotating to fallback key...")
+                            raw_json = response.choices[0].message.content
+                            parsed = json.loads(raw_json)
+                            return schema.model_validate(parsed)
 
-        raise RuntimeError(f"Groq structured output failed across all {len(self.api_keys)} keys: {last_error}")
+                        except (ValidationError, json.JSONDecodeError) as e:
+                            last_error = e
+                            logger.warning(f"Groq ({target_model}) attempt {attempt + 1} validation failed: {e}")
+                            if attempt < max_retries:
+                                messages.append(
+                                    {
+                                        "role": "user",
+                                        "content": f"Your previous response failed validation: {e}. Output ONLY valid JSON matching the schema.",
+                                    }
+                                )
+
+                except Exception as api_err:
+                    last_error = api_err
+                    logger.warning(f"Groq key {key_index + 1} with model {target_model} failed: {api_err}. Trying fallback...")
+
+        raise RuntimeError(f"Groq structured output failed across all keys/models: {last_error}")

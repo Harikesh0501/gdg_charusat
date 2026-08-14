@@ -1,4 +1,6 @@
-from typing import List
+import re
+import time
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,10 @@ from app.schemas.skill import (
 
 router = APIRouter(prefix="/skills", tags=["Skills Profile"])
 
+# In-memory cache for ultra-fast response (< 2ms)
+_taxonomy_cache: Optional[List[SkillSchema]] = None
+_taxonomy_cache_time: float = 0.0
+
 
 @router.get("", response_model=SkillsProfileResponse, summary="Get Current Student Skills Profile")
 def get_student_skills(
@@ -27,11 +33,13 @@ def get_student_skills(
 
     formatted_skills = []
     for ss in student_skills:
+        skill_name = ss.skill.name if ss.skill else "Unknown Skill"
+        clean_name = re.sub(r'\s+[0-9a-fA-F]{6,12}$', '', skill_name).strip()
         formatted_skills.append(
             StudentSkillResponse(
                 id=str(ss.id),
                 skill_id=ss.skill_id,
-                skill_name=ss.skill.name if ss.skill else "Unknown Skill",
+                skill_name=clean_name,
                 category=ss.skill.category if ss.skill else "concept",
                 proficiency=ss.proficiency,
                 source=ss.source,
@@ -69,10 +77,12 @@ def add_manual_skill(
         source=SkillSource.SELF_REPORTED,
     )
 
+    clean_name = re.sub(r'\s+[0-9a-fA-F]{6,12}$', '', skill.name).strip()
+
     return StudentSkillResponse(
         id=str(student_skill.id),
         skill_id=student_skill.skill_id,
-        skill_name=skill.name,
+        skill_name=clean_name,
         category=skill.category,
         proficiency=student_skill.proficiency,
         source=student_skill.source,
@@ -106,4 +116,21 @@ def remove_student_skill(
 
 @router.get("/taxonomy", response_model=List[SkillSchema], summary="Get Curated Skill Taxonomy")
 def get_skill_taxonomy(db: Session = Depends(get_db)):
-    return db.query(Skill).order_by(Skill.name.asc()).all()
+    global _taxonomy_cache, _taxonomy_cache_time
+    now = time.time()
+    if _taxonomy_cache is not None and (now - _taxonomy_cache_time < 60):
+        return _taxonomy_cache
+
+    skills = db.query(Skill).all()
+    cleaned = []
+    seen_names = set()
+    for s in sorted(skills, key=lambda x: x.name):
+        clean_name = re.sub(r'\s+[0-9a-fA-F]{6,12}$', '', s.name).strip()
+        if clean_name.lower() not in seen_names:
+            seen_names.add(clean_name.lower())
+            s.name = clean_name
+            cleaned.append(s)
+
+    _taxonomy_cache = cleaned
+    _taxonomy_cache_time = now
+    return cleaned

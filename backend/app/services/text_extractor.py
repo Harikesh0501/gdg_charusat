@@ -49,6 +49,9 @@ def extract_text_from_bytes(file_bytes: bytes, filename: str) -> str:
     cleaned_text = re.sub(r"[ \t]+", " ", extracted_text)
     cleaned_text = re.sub(r"\n\s*\n+", "\n", cleaned_text).strip()
 
+    # Clean single-letter spacing artifacts (e.g. "j a v a s c r i p t" -> "javascript")
+    cleaned_text = re.sub(r'(?<=\b[a-zA-Z0-9]) (?=[a-zA-Z0-9]\b)', '', cleaned_text)
+
     if len(cleaned_text) < 50:
         raise ValueError(
             "Extracted text is too short (< 50 characters). File may be empty or an unparseable scanned image."
