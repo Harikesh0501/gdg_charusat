@@ -144,6 +144,7 @@ def seed_catalog():
         projects_data = [
             {
                 "title": "End-to-End Predictive Machine Learning Pipeline",
+                "url": "https://github.com/scikit-learn/scikit-learn",
                 "description": "Build a production ML pipeline using Python, Scikit-Learn, Streamlit dashboard, and automated evaluation metrics.",
                 "difficulty": 3,
                 "estimated_hours": 20,
@@ -151,7 +152,17 @@ def seed_catalog():
                 "skills": ["Machine Learning", "Python", "Data Analysis", "Streamlit"]
             },
             {
+                "title": "Pandas Automated Data Cleaning & Exploratory Data Analysis Pipeline",
+                "url": "https://github.com/pandas-dev/pandas",
+                "description": "Build a scalable data processing pipeline for multi-source CSV/JSON ingestion, outlier detection, and statistical profiling.",
+                "difficulty": 2,
+                "estimated_hours": 15,
+                "career_relevance": "Data Scientist / ML Engineer",
+                "skills": ["Pandas", "Python", "Data Analysis"]
+            },
+            {
                 "title": "RAG-Powered AI Knowledge Assistant",
+                "url": "https://github.com/langchain-ai/langchain",
                 "description": "Develop a retrieval-augmented generation app using Vector DB embeddings, LLM Integration, and Contextual AI response system.",
                 "difficulty": 4,
                 "estimated_hours": 30,
@@ -160,6 +171,7 @@ def seed_catalog():
             },
             {
                 "title": "High-Performance RESTful Microservice with FastAPI",
+                "url": "https://github.com/fastapi/fastapi",
                 "description": "Design stateless backend microservices featuring OAuth2 auth, Pydantic validation, and multi-tenant DB architecture.",
                 "difficulty": 3,
                 "estimated_hours": 25,
@@ -168,6 +180,7 @@ def seed_catalog():
             },
             {
                 "title": "Responsive Full-Stack E-Commerce Platform",
+                "url": "https://github.com/vercel/next.js",
                 "description": "Construct a full-stack platform using React, REST APIs, responsive glassmorphism UI, and real-time state management.",
                 "difficulty": 3,
                 "estimated_hours": 35,
@@ -176,6 +189,7 @@ def seed_catalog():
             },
             {
                 "title": "Algorithm Visualizer & Graph Solver",
+                "url": "https://github.com/trekhleb/javascript-algorithms",
                 "description": "Create an interactive visualizer for BFS, DFS, Dijkstra's algorithm, and complex data structures.",
                 "difficulty": 2,
                 "estimated_hours": 15,
@@ -220,9 +234,13 @@ def seed_catalog():
             try:
                 skill_objs = get_skill_objs(p_item["skills"])
                 existing = db.query(Project).filter(Project.title == p_item["title"]).first()
-                if not existing:
+                if existing:
+                    existing.url = p_item["url"]
+                    existing.description = p_item["description"]
+                else:
                     proj = Project(
                         title=p_item["title"],
+                        url=p_item["url"],
                         description=p_item["description"],
                         difficulty=p_item["difficulty"],
                         estimated_hours=p_item["estimated_hours"],
@@ -231,7 +249,7 @@ def seed_catalog():
                     if skill_objs:
                         proj.skills.extend(skill_objs)
                     db.add(proj)
-                    db.commit()
+                db.commit()
             except Exception as e:
                 db.rollback()
                 print(f"Error seeding project {p_item['title']}: {e}")

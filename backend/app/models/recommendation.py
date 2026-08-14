@@ -69,6 +69,7 @@ class Project(Base):
     difficulty = Column(Integer, default=2, nullable=False)
     estimated_hours = Column(Integer, default=15, nullable=False)
     career_relevance = Column(String(255), nullable=True)
+    url = Column(String(500), nullable=True)
 
     skills = relationship("Skill", secondary=project_skills, backref="projects")
 
