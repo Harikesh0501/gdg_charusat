@@ -14,8 +14,10 @@ def client():
 @pytest.fixture
 def db():
     session = SessionLocal()
+    session.begin_nested()
     try:
         yield session
     finally:
+        session.rollback()
         session.close()
 

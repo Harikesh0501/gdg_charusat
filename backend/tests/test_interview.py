@@ -25,7 +25,7 @@ def test_interview_questions_retrieval_and_evaluation(db):
         skill_id=skill.id,
         category=QuestionCategory.TECHNICAL,
         difficulty=3,
-        question_text=f"Explain core concepts of {skill.name} {u_id}.",
+        question_text=f"Explain core concepts of {skill.name} architecture and best practices.",
         ideal_answer_points=[
             "Syntax and core framework usage",
             "Performance and architecture best practices",
