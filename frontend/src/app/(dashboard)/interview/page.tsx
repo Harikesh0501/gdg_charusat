@@ -101,7 +101,7 @@ export default function MockInterviewPage() {
       const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
       // Check if student has uploaded resume or has skills
-      const skillsRes = await fetch(`${backendUrl}/api/skills`, { headers })
+      const skillsRes = await fetch(`${backendUrl}/api/skills?t=${Date.now()}`, { headers, cache: 'no-store' })
       if (skillsRes.ok) {
         const skillsData = await skillsRes.json()
         if (!skillsData.skills || skillsData.skills.length === 0) {
@@ -113,10 +113,21 @@ export default function MockInterviewPage() {
         }
       }
 
-      const res = await fetch(`${backendUrl}/api/interview/questions`, { headers })
+      const res = await fetch(`${backendUrl}/api/interview/questions?t=${Date.now()}`, { headers, cache: 'no-store' })
       if (!res.ok) throw new Error('Failed to load questions')
 
       const data: PracticeQuestionsData = await res.json()
+      
+      // Shuffle questions client-side on new session kit to guarantee fresh active question at index 0
+      if (data.questions && data.questions.length > 1) {
+        const currentActiveId = questionsData?.questions[currentIdx]?.id
+        let shuffled = [...data.questions].sort(() => Math.random() - 0.5)
+        if (currentActiveId && shuffled[0].id === currentActiveId && shuffled.length > 1) {
+          shuffled.push(shuffled.shift()!)
+        }
+        data.questions = shuffled
+      }
+
       setQuestionsData(data)
       setCurrentIdx(0)
       setAnswerText('')

@@ -6,7 +6,7 @@ from app.repositories.recommendation import RecommendationRepository
 from app.repositories.career import CareerRepository
 from app.repositories.profile import ProfileRepository
 from app.services.skill_gap import SkillGapService
-from app.services.github_search import GitHubSearchEngine
+from app.services.web_search_engine import InternetSearchEngine
 from app.ai.extractors.recommendation_explanation import RecommendationExplanationExtractor
 
 logger = logging.getLogger(__name__)
@@ -172,10 +172,10 @@ class RecommendationService:
             first_skill = matched_skill_names[0] if matched_skill_names else "Python"
             title = getattr(item, "title", "Project")
 
-            # Dynamic Search Engine Query to discover real open-source GitHub project repos
-            search_result = GitHubSearchEngine.search_repository(title, matched_skill_names)
+            # Full-Internet Web & Repository Search Engine Query
+            search_result = InternetSearchEngine.search_project_source(title, matched_skill_names)
             proj_url = search_result.get("url") or proj_url
-            source_ref = search_result.get("source_reference", "GitHub Verified Open Source Specification")
+            source_ref = search_result.get("source_reference", "Verified Internet Web Specification")
 
             # 4 Step-by-Step Milestones with Dedicated Resource Links
             milestones = [
