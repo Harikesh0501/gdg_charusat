@@ -143,6 +143,15 @@ def seed_catalog():
         # --- SEED HANDS-ON PROJECTS ---
         projects_data = [
             {
+                "title": "Production Async FastAPI REST API & Database",
+                "url": "https://github.com/tiangolo/full-stack-fastapi-template",
+                "description": "Create a secure RESTful API microservice with FastAPI, SQLAlchemy 2.0 ORM, Alembic migrations, PostgreSQL, and Pytest coverage.",
+                "difficulty": 3,
+                "estimated_hours": 25,
+                "career_relevance": "Backend Engineer",
+                "skills": ["Rest Api Design", "Python", "Stateless Services"]
+            },
+            {
                 "title": "End-to-End Predictive Machine Learning Pipeline",
                 "url": "https://github.com/scikit-learn/scikit-learn",
                 "description": "Build a production ML pipeline using Python, Scikit-Learn, Streamlit dashboard, and automated evaluation metrics.",
