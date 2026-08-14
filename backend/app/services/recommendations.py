@@ -6,6 +6,7 @@ from app.repositories.recommendation import RecommendationRepository
 from app.repositories.career import CareerRepository
 from app.repositories.profile import ProfileRepository
 from app.services.skill_gap import SkillGapService
+from app.services.github_search import GitHubSearchEngine
 from app.ai.extractors.recommendation_explanation import RecommendationExplanationExtractor
 
 logger = logging.getLogger(__name__)
@@ -169,24 +170,12 @@ class RecommendationService:
 
         if category == "project":
             first_skill = matched_skill_names[0] if matched_skill_names else "Python"
-            title_clean = getattr(item, "title", "").lower()
+            title = getattr(item, "title", "Project")
 
-            # Ensure specific, verified open source GitHub repository link
-            if not proj_url or "topics" in proj_url:
-                if "fastapi" in title_clean or "microservice" in title_clean:
-                    proj_url = "https://github.com/tiangolo/full-stack-fastapi-template"
-                elif "rag" in title_clean or "llm" in title_clean or "ai" in title_clean:
-                    proj_url = "https://github.com/langchain-ai/langchain"
-                elif "pandas" in title_clean or "data analysis" in title_clean:
-                    proj_url = "https://github.com/pandas-dev/pandas"
-                elif "machine learning" in title_clean or "predictive" in title_clean:
-                    proj_url = "https://github.com/scikit-learn/scikit-learn"
-                elif "e-commerce" in title_clean or "full-stack" in title_clean:
-                    proj_url = "https://github.com/vercel/next.js"
-                else:
-                    proj_url = f"https://github.com/search?q={getattr(item, 'title', 'project').replace(' ', '+')}"
-
-            source_ref = "GitHub Verified Open Source Specification"
+            # Dynamic Search Engine Query to discover real open-source GitHub project repos
+            search_result = GitHubSearchEngine.search_repository(title, matched_skill_names)
+            proj_url = search_result.get("url") or proj_url
+            source_ref = search_result.get("source_reference", "GitHub Verified Open Source Specification")
 
             # 4 Step-by-Step Milestones with Dedicated Resource Links
             milestones = [
