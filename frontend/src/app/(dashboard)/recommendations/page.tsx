@@ -211,7 +211,7 @@ export default function RecommendationsPage() {
         <div className="glass-panel p-6 rounded-2xl border border-rose-200 text-center text-rose-700 text-sm font-medium">
           {error}
         </div>
-      ) : !data?.items || data.items.length === 0 ? (
+      ) : !data?.career_role_name ? (
         <div className="glass-panel p-10 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-xs bg-white">
           <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
             <Target className="w-7 h-7" />
@@ -228,6 +228,16 @@ export default function RecommendationsPage() {
             <span>Go to Roadmap Command Center</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
+        </div>
+      ) : !data?.items || data.items.length === 0 ? (
+        <div className="glass-panel p-10 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-xs bg-white">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
+            <Sparkles className="w-7 h-7" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">All Gaps Covered for {data.career_role_name}!</h3>
+          <p className="text-sm text-slate-500">
+            You have satisfied the required proficiencies for this category, or no additional items are currently needed. Check other tabs or update your target role.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

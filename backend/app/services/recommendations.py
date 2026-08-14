@@ -46,6 +46,10 @@ class RecommendationService:
         category_clean = category.lower().strip()
         scored_items = []
 
+        # 3. Candidate Retrieval & Scoring
+        category_clean = category.lower().strip()
+        scored_items = []
+
         if category_clean == "project":
             candidates = self.recommendation_repo.get_projects_by_skill_ids(gap_skill_ids)
             for proj in candidates:
@@ -64,6 +68,27 @@ class RecommendationService:
                 item_data = self._score_item(res, gap_map, interests, "resource")
                 if item_data:
                     scored_items.append(item_data)
+
+        # Fallback: if no candidates matched exact gap_skill_ids, fetch all items in category
+        if not scored_items:
+            if category_clean == "project":
+                fallback_candidates = self.recommendation_repo.get_projects_by_skill_ids([])
+                for proj in fallback_candidates:
+                    item_data = self._score_item(proj, gap_map, interests, "project", is_fallback=True)
+                    if item_data:
+                        scored_items.append(item_data)
+            elif category_clean == "certification":
+                fallback_candidates = self.recommendation_repo.get_certifications_by_skill_ids([])
+                for cert in fallback_candidates:
+                    item_data = self._score_item(cert, gap_map, interests, "certification", is_fallback=True)
+                    if item_data:
+                        scored_items.append(item_data)
+            else:
+                fallback_candidates = self.recommendation_repo.get_resources_by_skill_ids([])
+                for res in fallback_candidates:
+                    item_data = self._score_item(res, gap_map, interests, "resource", is_fallback=True)
+                    if item_data:
+                        scored_items.append(item_data)
 
         # 4. Rank candidates by score descending
         scored_items.sort(key=lambda x: x["score"], reverse=True)
@@ -96,7 +121,8 @@ class RecommendationService:
         item: Any,
         gap_map: Dict[int, Dict[str, Any]],
         interests: List[str],
-        category: str
+        category: str,
+        is_fallback: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
         Applies deterministic candidate filtering & scoring formula:
@@ -105,11 +131,13 @@ class RecommendationService:
         item_skills = getattr(item, "skills", [])
         matched_gaps = [gap_map[s.id] for s in item_skills if s.id in gap_map]
 
-        if not matched_gaps and gap_map:
-            # Skip candidate if it does not cover any active gap skill
+        if not matched_gaps and gap_map and not is_fallback:
+            # Skip candidate if it does not cover any active gap skill (unless in fallback mode)
             return None
 
         matched_skill_names = [g.get("name", g.get("skill_name", "")) for g in matched_gaps]
+        if not matched_skill_names and item_skills:
+            matched_skill_names = [s.name for s in item_skills]
 
         # Signal 1: gap_priority_weight (best-matching gap skill weight)
         # priority_bucket: high=3, medium=2, low=1
