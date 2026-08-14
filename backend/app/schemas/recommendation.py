@@ -2,12 +2,19 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class MilestoneResponse(BaseModel):
+    id: str
+    step: str
+    task: str
+
+
 class RecommendationItemResponse(BaseModel):
     id: int
     category: str
     title: str
     url: Optional[str] = None
     provider: Optional[str] = "SkillForge Curation"
+    source_reference: Optional[str] = None
     type: Optional[str] = "course"
     description: Optional[str] = None
     difficulty: int = 2
@@ -15,6 +22,7 @@ class RecommendationItemResponse(BaseModel):
     level: Optional[str] = "entry"
     career_relevance: Optional[str] = None
     matched_gap_skills: List[str] = Field(default_factory=list)
+    milestones: List[MilestoneResponse] = Field(default_factory=list)
     score: float
     explanation: str
 
