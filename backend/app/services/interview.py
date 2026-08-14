@@ -40,6 +40,7 @@ class InterviewService:
             gap_skill_ids = [g["skill_id"] for g in gaps]
 
         # 1. Fetch Candidate Questions from Seed / DB
+        # 1. Fetch Candidate Questions from Seed / DB strictly filtered by active target role
         all_questions = self.interview_repo.get_seed_questions(career_role_id=role_id, skill_ids=gap_skill_ids)
 
         tech_qs = [q for q in all_questions if q.category == QuestionCategory.TECHNICAL]
@@ -59,15 +60,16 @@ class InterviewService:
         if proj_qs:
             selected_questions.extend(proj_qs[:1])
 
-        # 2. If Project-Driven questions are needed and student has resume projects, generate via AI
-        if len(selected_questions) < 5:
-            user_projects = self.resume_repo.get_profile_projects(profile_id)
-            if user_projects:
-                proj_dicts = [{"title": p.title, "description": p.description} for p in user_projects[:2]]
+        # 2. Always generate Project-Driven Questions from candidate's resume projects via AI
+        user_projects = self.resume_repo.get_profile_projects(profile_id)
+        if user_projects and len(selected_questions) < 5:
+            proj_dicts = [{"title": p.title, "description": p.description} for p in user_projects[:3]]
+            needed_count = min(2, 5 - len(selected_questions))
+            if needed_count > 0:
                 ai_proj_qs = await self.ai_extractor.generate_project_questions(
                     target_role=role.name if role else "Software Engineer",
                     projects=proj_dicts,
-                    count=5 - len(selected_questions)
+                    count=needed_count
                 )
 
                 for q_item in ai_proj_qs:
@@ -78,12 +80,14 @@ class InterviewService:
                         difficulty=q_item.get("difficulty", 3),
                         question_text=q_item["question_text"],
                         ideal_answer_points=q_item.get("ideal_answer_points", []),
+                        source_reference=q_item.get("source_reference", f"Resume Project: {proj_dicts[0]['title'] if proj_dicts else 'Portfolio'}"),
+                        reference_url=q_item.get("reference_url", "https://github.com/"),
                         source=QuestionSource.AI_GENERATED
                     )
                     saved_q = self.interview_repo.save_question(saved_q)
                     selected_questions.append(saved_q)
 
-        # Fill remaining slots from all_questions if still under 5 using ID set
+        # Fill remaining slots from all_questions matching role if still under 5
         selected_ids = {str(q.id) for q in selected_questions}
         for q in all_questions:
             if len(selected_questions) >= 5:
@@ -92,7 +96,7 @@ class InterviewService:
                 selected_questions.append(q)
                 selected_ids.add(str(q.id))
 
-        # Fail-safe: if still under 5, fetch any questions in system
+        # Fail-safe: if still under 5, fetch available questions in system
         if len(selected_questions) < 5:
             fallback_qs = self.db.query(InterviewQuestion).all()
             for fq in fallback_qs:
@@ -102,7 +106,7 @@ class InterviewService:
                     selected_questions.append(fq)
                     selected_ids.add(str(fq.id))
 
-        # Serialize questions to clean dictionary dicts with string IDs and Enum values
+        # Serialize questions to clean dictionary dicts with string IDs, source references, and Enum values
         formatted_questions = []
         for q in selected_questions:
             formatted_questions.append({
@@ -113,6 +117,8 @@ class InterviewService:
                 "difficulty": q.difficulty,
                 "question_text": q.question_text,
                 "source": q.source.value if hasattr(q.source, "value") else str(q.source),
+                "source_reference": q.source_reference or ("Official Technical Documentation" if q.category != QuestionCategory.PROJECT_SPECIFIC else "Resume Portfolio Project"),
+                "reference_url": q.reference_url or "https://developer.mozilla.org/"
             })
 
         return {

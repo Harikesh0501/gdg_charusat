@@ -96,22 +96,22 @@ class InterviewAIExtractor:
                 schema=InterviewEvaluationResult
             )
 
-            # Ensure valid non-zero score and default strengths if empty
-            valid_score = max(35, min(100, result.score)) if result.score is not None else 70
+            # Ensure valid non-zero score and default strengths if empty (Allow scores up to 100%)
+            valid_score = max(40, min(100, result.score)) if result.score is not None else 85
             result.score = valid_score
             if not result.strengths:
-                result.strengths = ["Demonstrated clear technical vocabulary and structured communication."]
+                result.strengths = ["Demonstrated solid technical accuracy and clear architectural reasoning."]
             if not result.weaknesses:
-                result.weaknesses = ["Could expand further on edge case handling and optimization."]
+                result.weaknesses = ["Could expand further on edge case handling, automated testing, and performance metrics."]
             return result
 
         except Exception as e:
             logger.warning(f"Groq answer evaluation failed: {e}. Using deterministic fallback evaluation.")
             word_count = len(candidate_answer.split())
-            score = min(85, max(45, word_count * 3))
+            score = min(98, max(50, word_count * 2 + 35))
             return InterviewEvaluationResult(
                 score=score,
-                strengths=["Provided a structured response addressing the core question."],
-                weaknesses=["Could include more specific performance benchmarks and edge cases."],
-                feedback="Good technical effort! To maximize your interview score, expand on real-world implementation trade-offs and error-handling strategies."
+                strengths=["Provided a clear, structured technical explanation addressing the core question."],
+                weaknesses=["Consider adding explicit benchmarks, error handling strategies, and boundary condition checks."],
+                feedback="Solid technical response! To achieve a perfect 100% score, expand on real-world scalability trade-offs and error recovery mechanisms."
             )

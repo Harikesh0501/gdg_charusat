@@ -31,6 +31,8 @@ class InterviewQuestion(Base):
     difficulty = Column(Integer, default=2, nullable=False)
     question_text = Column(Text, nullable=False)
     ideal_answer_points = Column(JSON, nullable=True)  # List of string criteria for evaluation
+    source_reference = Column(String(255), nullable=True)  # e.g. 'FastAPI Official Documentation'
+    reference_url = Column(String(500), nullable=True)  # e.g. 'https://fastapi.tiangolo.com'
     source = Column(
         SQLEnum(QuestionSource, name="question_source_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False,

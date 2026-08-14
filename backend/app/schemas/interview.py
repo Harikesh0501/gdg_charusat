@@ -10,6 +10,8 @@ class QuestionResponse(BaseModel):
     difficulty: int
     question_text: str
     source: str
+    source_reference: Optional[str] = None
+    reference_url: Optional[str] = None
 
 
 class PracticeQuestionsResponse(BaseModel):
