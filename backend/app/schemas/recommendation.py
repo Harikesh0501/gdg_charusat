@@ -6,6 +6,9 @@ class MilestoneResponse(BaseModel):
     id: str
     step: str
     task: str
+    resource_title: Optional[str] = None
+    resource_url: Optional[str] = None
+    resource_provider: Optional[str] = None
 
 
 class RecommendationItemResponse(BaseModel):

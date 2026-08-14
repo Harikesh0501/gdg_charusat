@@ -169,31 +169,58 @@ class RecommendationService:
 
         if category == "project":
             first_skill = matched_skill_names[0] if matched_skill_names else "Python"
-            if not proj_url:
-                slug = first_skill.lower().replace(" ", "-")
-                proj_url = f"https://github.com/topics/{slug}"
-            source_ref = "GitHub Verified Open Source Blueprint"
+            title_clean = getattr(item, "title", "").lower()
 
+            # Ensure specific, verified open source GitHub repository link
+            if not proj_url or "topics" in proj_url:
+                if "fastapi" in title_clean or "microservice" in title_clean:
+                    proj_url = "https://github.com/tiangolo/full-stack-fastapi-template"
+                elif "rag" in title_clean or "llm" in title_clean or "ai" in title_clean:
+                    proj_url = "https://github.com/langchain-ai/langchain"
+                elif "pandas" in title_clean or "data analysis" in title_clean:
+                    proj_url = "https://github.com/pandas-dev/pandas"
+                elif "machine learning" in title_clean or "predictive" in title_clean:
+                    proj_url = "https://github.com/scikit-learn/scikit-learn"
+                elif "e-commerce" in title_clean or "full-stack" in title_clean:
+                    proj_url = "https://github.com/vercel/next.js"
+                else:
+                    proj_url = f"https://github.com/search?q={getattr(item, 'title', 'project').replace(' ', '+')}"
+
+            source_ref = "GitHub Verified Open Source Specification"
+
+            # 4 Step-by-Step Milestones with Dedicated Resource Links
             milestones = [
                 {
                     "id": "m1",
                     "step": "Phase 1: Environment & Architecture Foundations",
-                    "task": f"Initialize project repository, virtual environment, and core project structure tailored for {first_skill}."
+                    "task": f"Initialize project repository, virtual environment, and core project configuration for {first_skill}.",
+                    "resource_title": f"{first_skill} Project Architecture & Venv Guide",
+                    "resource_url": "https://docs.python.org/3/tutorial/venv.html",
+                    "resource_provider": "Python Docs"
                 },
                 {
                     "id": "m2",
                     "step": "Phase 2: Core Domain Logic & Algorithmic Engine",
-                    "task": f"Implement core computational logic, data models, and business services using {', '.join(matched_skill_names[:2])}."
+                    "task": f"Implement core computational logic, data models, and business services using {', '.join(matched_skill_names[:2])}.",
+                    "resource_title": f"{matched_skill_names[0] if matched_skill_names else first_skill} Core Tutorial & API Specs",
+                    "resource_url": f"https://developer.mozilla.org/en-US/search?q={first_skill.replace(' ', '+')}",
+                    "resource_provider": f"{first_skill} Official Docs"
                 },
                 {
                     "id": "m3",
-                    "step": "Phase 3: Data Persistence & API Integration",
-                    "task": "Configure database schemas, ORM queries, caching layers, and external service contracts."
+                    "step": "Phase 3: Data Persistence & Integration Layer",
+                    "task": "Configure database schemas, ORM queries, caching layers, and external service contracts.",
+                    "resource_title": "PostgreSQL & Redis Caching Integration Specs",
+                    "resource_url": "https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html",
+                    "resource_provider": "SQLAlchemy Docs"
                 },
                 {
                     "id": "m4",
                     "step": "Phase 4: Automated Testing & Production Containerization",
-                    "task": "Write end-to-end integration tests, package into a multi-stage Docker container, and document setup in README."
+                    "task": "Write end-to-end integration tests, package into a multi-stage Docker container, and document setup in README.",
+                    "resource_title": "Docker Multi-Stage Build & Pytest Automation Specs",
+                    "resource_url": "https://docs.docker.com/build/building/multi-stage/",
+                    "resource_provider": "Docker Docs"
                 }
             ]
 
