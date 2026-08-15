@@ -18,6 +18,9 @@ class ProgressAnalyticsResponse(BaseModel):
     roadmap_completion_percentage: int
     completed_roadmap_items: int
     total_roadmap_items: int
+    total_chapters_count: int = 0
+    completed_chapters_count: int = 0
+    chapter_breakdown: List[Dict[str, Any]] = Field(default_factory=list)
     activity_timeline: List[ActivityTimelineItem] = Field(default_factory=list)
 
 
