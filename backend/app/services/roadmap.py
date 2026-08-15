@@ -126,14 +126,17 @@ class RoadmapService:
 
                 chapter_title = f"Chapter {order_idx}.{chap_idx}: {s_name} Foundations & Hands-On Deep Dive"
 
-                # Match candidate resource from catalog
+                # Resolve direct high-quality destination resource via InternetSearchEngine
+                skill_res = InternetSearchEngine.search_skill_resource(s_name)
+
+                # Match candidate resource from catalog if available
                 matched_res = next((r for r in catalog_resources if any(s.id == s_id_int for s in r.skills)), None)
-                res_url = matched_res.url if matched_res else f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
-                res_provider = matched_res.provider if matched_res else f"{s_name} Official Docs"
+                res_url = matched_res.url if matched_res else skill_res["url"]
+                res_provider = matched_res.provider if matched_res else skill_res["provider"]
                 res_title = matched_res.title if matched_res else f"{s_name} Core Concepts & Tutorial"
 
-                # 1. Interactive Skill Practice Item with practice URL & provider
-                skill_url = f"https://google.com/search?q={s_name.replace(' ', '+')}+interactive+tutorial+docs"
+                # 1. Interactive Skill Practice Item with authentic direct URL & provider
+                skill_url = skill_res["url"]
                 skill_item = RoadmapItem(
                     id=str(uuid.uuid4()),
                     phase_id=phase_id,
@@ -234,18 +237,18 @@ class RoadmapService:
 
                 # 2. Backfill ref_url and ref_provider for SKILL items
                 if item.type == RoadmapItemType.SKILL:
-                    s_name = item.ref_skill.name if item.ref_skill else "Technical Skill"
+                    s_name = item.ref_skill.name if item.ref_skill else item.title.replace("Core Lesson & Concept Practice:", "").strip()
                     res = InternetSearchEngine.search_skill_resource(s_name)
-                    if not item.ref_url or "google.com/search" in item.ref_url:
+                    if not item.ref_url or "google.com/search" in item.ref_url or "search?q=" in item.ref_url:
                         item.ref_url = res["url"]
                         item.ref_provider = f"{s_name.upper()} PRACTICE LAB"
                         modified = True
 
                 # 3. Backfill ref_url and ref_provider for RESOURCE items
                 if item.type == RoadmapItemType.RESOURCE:
-                    s_name = item.ref_skill.name if item.ref_skill else "Technical Skills"
+                    s_name = item.ref_skill.name if item.ref_skill else item.title.replace("Study Resource:", "").replace("Core Concepts & Tutorial", "").strip()
                     res = InternetSearchEngine.search_skill_resource(s_name)
-                    if not item.ref_url or "google.com/search" in item.ref_url or "developer.mozilla.org" in item.ref_url:
+                    if not item.ref_url or "google.com/search" in item.ref_url or "developer.mozilla.org/en-US/search" in item.ref_url or "search?q=" in item.ref_url:
                         item.ref_url = res["url"]
                         item.ref_provider = res["provider"]
                         modified = True

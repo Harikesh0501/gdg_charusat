@@ -10,107 +10,185 @@ logger = logging.getLogger(__name__)
 # In-memory search cache
 _WEB_SEARCH_CACHE: Dict[str, Dict[str, Any]] = {}
 
-# Rich Curated Registry for High-Quality Learning Platforms & Documentation
+# Comprehensive High-Quality Learning Platforms & Documentation Registry
 SKILL_RESOURCE_REGISTRY: Dict[str, Dict[str, str]] = {
-    "react": {
-        "url": "https://react.dev/learn",
-        "provider": "React Official Documentation",
-        "coursera": "https://www.coursera.org/learn/react-basics"
+    # System Architecture & Design
+    "system design": {
+        "url": "https://github.com/donnemartin/system-design-primer",
+        "provider": "System Design Primer (GitHub)"
     },
-    "next.js": {
-        "url": "https://nextjs.org/docs/app/building-your-application/routing",
-        "provider": "Next.js Official Documentation",
-        "coursera": "https://www.coursera.org/learn/meta-front-end-developer"
+    "distributed systems": {
+        "url": "https://github.com/aphyr/distsys-class",
+        "provider": "Distributed Systems Class & Architecture Guide"
+    },
+    "microservices": {
+        "url": "https://microservices.io/patterns/microservices.html",
+        "provider": "Microservice Architecture Patterns"
+    },
+
+    # Python & Frameworks
+    "python": {
+        "url": "https://docs.python.org/3/tutorial/",
+        "provider": "Python Official Documentation"
     },
     "fastapi": {
         "url": "https://fastapi.tiangolo.com/tutorial/",
-        "provider": "FastAPI Official Documentation",
-        "coursera": "https://www.coursera.org/learn/api-development-python"
+        "provider": "FastAPI Official Documentation & Tutorial"
     },
-    "python": {
-        "url": "https://docs.python.org/3/tutorial/",
-        "provider": "Python Official Tutorial",
-        "coursera": "https://www.coursera.org/specializations/python"
+    "django": {
+        "url": "https://docs.djangoproject.com/en/stable/intro/tutorial01/",
+        "provider": "Django Official Tutorial"
     },
-    "pandas": {
-        "url": "https://pandas.pydata.org/docs/user_guide/index.html",
-        "provider": "Pandas User Guide",
-        "coursera": "https://www.coursera.org/learn/data-analysis-with-python"
+    "flask": {
+        "url": "https://flask.palletsprojects.com/en/latest/tutorial/",
+        "provider": "Flask Official Tutorial"
     },
-    "scikit-learn": {
-        "url": "https://scikit-learn.org/stable/user_guide.html",
-        "provider": "Scikit-Learn User Guide",
-        "coursera": "https://www.coursera.org/learn/machine-learning-with-python"
-    },
-    "machine learning": {
-        "url": "https://scikit-learn.org/stable/tutorial/basic/tutorial.html",
-        "provider": "Scikit-Learn ML Specs",
-        "coursera": "https://www.coursera.org/specializations/machine-learning-introduction"
-    },
-    "docker": {
-        "url": "https://docs.docker.com/get-started/",
-        "provider": "Docker Official Documentation",
-        "coursera": "https://www.coursera.org/learn/docker-container-fundamentals"
-    },
-    "kubernetes": {
-        "url": "https://kubernetes.io/docs/tutorials/kubernetes-basics/",
-        "provider": "Kubernetes Official Tutorials",
-        "coursera": "https://www.coursera.org/learn/google-kubernetes-engine"
-    },
-    "aws": {
-        "url": "https://aws.amazon.com/getting-started/",
-        "provider": "AWS Getting Started Center",
-        "coursera": "https://www.coursera.org/specializations/aws-fundamentals"
-    },
-    "git": {
-        "url": "https://git-scm.com/book/en/v2",
-        "provider": "Pro Git Official Book",
-        "coursera": "https://www.coursera.org/learn/version-control-with-git"
-    },
-    "sql": {
-        "url": "https://www.w3schools.com/sql/",
-        "provider": "W3Schools SQL Tutorial",
-        "coursera": "https://www.coursera.org/learn/sql-for-data-science"
-    },
-    "postgresql": {
-        "url": "https://www.postgresql.org/docs/current/tutorial.html",
-        "provider": "PostgreSQL Official Tutorial",
-        "coursera": "https://www.coursera.org/learn/relational-database-administration"
-    },
+
+    # JavaScript / TypeScript & Frontend
     "javascript": {
         "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide",
-        "provider": "MDN Web Docs",
-        "coursera": "https://www.coursera.org/learn/programming-with-javascript"
+        "provider": "MDN Web Docs"
     },
     "typescript": {
         "url": "https://www.typescriptlang.org/docs/handbook/intro.html",
-        "provider": "TypeScript Handbook",
-        "coursera": "https://www.coursera.org/learn/typescript-fundamentals"
+        "provider": "TypeScript Handbook"
+    },
+    "react": {
+        "url": "https://react.dev/learn",
+        "provider": "React Official Documentation"
+    },
+    "next.js": {
+        "url": "https://nextjs.org/docs/app/building-your-application/routing",
+        "provider": "Next.js App Router Documentation"
+    },
+    "node.js": {
+        "url": "https://nodejs.org/en/learn/getting-started/introduction-to-nodejs",
+        "provider": "Node.js Official Documentation"
+    },
+    "html": {
+        "url": "https://developer.mozilla.org/en-US/docs/Learn/HTML",
+        "provider": "MDN Web Docs HTML Guide"
+    },
+    "css": {
+        "url": "https://developer.mozilla.org/en-US/docs/Learn/CSS",
+        "provider": "MDN Web Docs CSS Guide"
+    },
+    "tailwind": {
+        "url": "https://tailwindcss.com/docs/utility-first",
+        "provider": "Tailwind CSS Official Documentation"
+    },
+
+    # Data Science & Machine Learning
+    "pandas": {
+        "url": "https://pandas.pydata.org/docs/user_guide/index.html",
+        "provider": "Pandas User Guide"
+    },
+    "numpy": {
+        "url": "https://numpy.org/doc/stable/user/absolute_beginners.html",
+        "provider": "NumPy Absolute Beginners Guide"
+    },
+    "scikit-learn": {
+        "url": "https://scikit-learn.org/stable/user_guide.html",
+        "provider": "Scikit-Learn User Guide"
+    },
+    "machine learning": {
+        "url": "https://scikit-learn.org/stable/tutorial/basic/tutorial.html",
+        "provider": "Scikit-Learn ML Tutorial"
+    },
+    "pytorch": {
+        "url": "https://pytorch.org/tutorials/beginner/basics/intro.html",
+        "provider": "PyTorch Official Tutorials"
+    },
+    "tensorflow": {
+        "url": "https://www.tensorflow.org/tutorials",
+        "provider": "TensorFlow Official Tutorials"
+    },
+    "rag": {
+        "url": "https://python.langchain.com/docs/tutorials/rag/",
+        "provider": "LangChain RAG Architecture Guide"
+    },
+    "llm": {
+        "url": "https://python.langchain.com/docs/tutorials/rag/",
+        "provider": "LangChain LLM Application Guide"
+    },
+
+    # Databases & Caching
+    "sql": {
+        "url": "https://www.w3schools.com/sql/",
+        "provider": "W3Schools SQL Tutorial"
+    },
+    "postgresql": {
+        "url": "https://www.postgresql.org/docs/current/tutorial.html",
+        "provider": "PostgreSQL Official Tutorial"
+    },
+    "mysql": {
+        "url": "https://dev.mysql.com/doc/refman/8.0/en/tutorial.html",
+        "provider": "MySQL Reference Tutorial"
+    },
+    "mongodb": {
+        "url": "https://www.mongodb.com/docs/manual/tutorial/getting-started/",
+        "provider": "MongoDB Getting Started Guide"
+    },
+    "redis": {
+        "url": "https://redis.io/docs/latest/develop/get-started/",
+        "provider": "Redis Official Getting Started"
+    },
+    "sqlalchemy": {
+        "url": "https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html",
+        "provider": "Async SQLAlchemy 2.0 Guide"
+    },
+
+    # DevOps, Cloud & Tools
+    "docker": {
+        "url": "https://docs.docker.com/get-started/",
+        "provider": "Docker Official Documentation"
+    },
+    "kubernetes": {
+        "url": "https://kubernetes.io/docs/tutorials/kubernetes-basics/",
+        "provider": "Kubernetes Official Tutorials"
+    },
+    "aws": {
+        "url": "https://aws.amazon.com/getting-started/",
+        "provider": "AWS Getting Started Center"
+    },
+    "git": {
+        "url": "https://git-scm.com/book/en/v2",
+        "provider": "Pro Git Official Book"
+    },
+    "linux": {
+        "url": "https://linuxjourney.com/",
+        "provider": "Linux Journey Interactive Learning"
+    },
+    "ci/cd": {
+        "url": "https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions",
+        "provider": "GitHub Actions CI/CD Documentation"
     },
     "rest api": {
         "url": "https://restfulapi.net/",
-        "provider": "REST API Tutorial & Best Practices",
-        "coursera": "https://www.coursera.org/learn/api-development-python"
+        "provider": "REST API Tutorial & Architecture Guide"
     },
-    "system design": {
-        "url": "https://github.com/donnemartin/system-design-primer",
-        "provider": "System Design Primer (GitHub)",
-        "coursera": "https://www.coursera.org/learn/software-architecture"
+    "graphql": {
+        "url": "https://graphql.org/learn/",
+        "provider": "GraphQL Official Learning Guide"
     },
+
+    # Data Structures & Algorithms
     "data structures": {
         "url": "https://www.geeksforgeeks.org/data-structures/",
-        "provider": "GeeksforGeeks Data Structures",
-        "coursera": "https://www.coursera.org/specializations/data-structures-algorithms"
+        "provider": "GeeksforGeeks Data Structures"
     },
     "algorithms": {
         "url": "https://www.geeksforgeeks.org/fundamentals-of-algorithms/",
-        "provider": "GeeksforGeeks Algorithms",
-        "coursera": "https://www.coursera.org/learn/algorithmic-toolbox"
+        "provider": "GeeksforGeeks Algorithms"
     }
 }
 
 # Authentic GitHub Repository Blueprints for Capstone Milestones & Projects
 MILESTONE_REPO_REGISTRY: Dict[str, Dict[str, str]] = {
+    "system design": {
+        "url": "https://github.com/donnemartin/system-design-primer",
+        "provider": "GitHub Repository: System Design Architecture Primer"
+    },
     "fastapi": {
         "url": "https://github.com/tiangolo/full-stack-fastapi-template",
         "provider": "GitHub Repository: Full-Stack FastAPI Template"
@@ -146,10 +224,6 @@ MILESTONE_REPO_REGISTRY: Dict[str, Dict[str, str]] = {
     "docker": {
         "url": "https://github.com/dockersamples/example-voting-app",
         "provider": "GitHub Repository: Multi-Container Docker Architecture"
-    },
-    "system design": {
-        "url": "https://github.com/donnemartin/system-design-primer",
-        "provider": "GitHub Repository: System Design Architecture Primer"
     },
     "default": {
         "url": "https://github.com/public-apis/public-apis",
@@ -230,7 +304,7 @@ class InternetSearchEngine:
 
     @classmethod
     def search_skill_resource(cls, skill_name: str) -> Dict[str, str]:
-        """Resolves direct learning platform courses (Coursera/MDN/W3Schools) or official docs for a skill."""
+        """Resolves direct learning platform courses or official docs for a skill (NEVER raw Google queries)."""
         s_clean = skill_name.lower().strip()
         
         # Check curated registry for exact or partial skill match
@@ -241,10 +315,10 @@ class InternetSearchEngine:
                     "provider": info["provider"]
                 }
 
-        # Dynamic high-quality destination URL (MDN / GeeksforGeeks / FreeCodeCamp)
+        # Dynamic high-quality destination URL
         clean_encoded = urllib.parse.quote(skill_name)
         return {
-            "url": f"https://developer.mozilla.org/en-US/search?q={clean_encoded}",
+            "url": f"https://www.geeksforgeeks.org/{clean_encoded.lower()}/",
             "provider": f"{skill_name} Official Documentation & Specs"
         }
 
