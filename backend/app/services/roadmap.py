@@ -13,6 +13,8 @@ from app.repositories.profile import ProfileRepository
 from app.services.skill_gap import SkillGapService
 from app.ai.extractors.roadmap_narrative import RoadmapNarrativeExtractor
 
+from app.services.web_search_engine import InternetSearchEngine
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,6 +26,7 @@ class RoadmapService:
         self.profile_repo = ProfileRepository(db)
         self.skill_gap_service = SkillGapService(db)
         self.narrative_extractor = RoadmapNarrativeExtractor()
+        self.search_engine = InternetSearchEngine()
 
     async def get_or_generate_roadmap(self, profile_id: str) -> Optional[Roadmap]:
         """
@@ -172,14 +175,17 @@ class RoadmapService:
 
             proj_title = matched_proj.title if matched_proj else f"Complete Capstone Project demonstrating {', '.join(phase_skill_names)}"
 
+            # Resolve authentic milestone repository blueprint spec
+            m_spec = InternetSearchEngine.search_milestone_spec(proj_title, ", ".join(phase_skill_names))
+
             milestone_item = RoadmapItem(
                 id=str(uuid.uuid4()),
                 phase_id=phase_id,
                 type=RoadmapItemType.MILESTONE,
                 chapter_title=capstone_chap,
                 title=f"Phase Milestone: {proj_title}",
-                ref_provider="SkillForge Portfolio Project",
-                ref_url="https://github.com/",
+                ref_provider=m_spec["provider"],
+                ref_url=m_spec["url"],
                 order_index=item_order,
                 status=RoadmapItemStatus.NOT_STARTED,
                 estimated_hours=12
@@ -195,7 +201,7 @@ class RoadmapService:
     def _backfill_roadmap_chapters_and_urls(self, roadmap: Roadmap):
         """
         Backfills existing active roadmaps to ensure every item has a distinct chapter title,
-        a real resource URL, and provider badge.
+        a real learning resource URL (Coursera, MDN, W3Schools), and an authentic GitHub milestone blueprint spec.
         """
         from app.models.recommendation import Resource, Project
         catalog_resources = self.db.query(Resource).all()
@@ -227,37 +233,30 @@ class RoadmapService:
                     modified = True
 
                 # 2. Backfill ref_url and ref_provider for SKILL items
-                if item.type == RoadmapItemType.SKILL and not item.ref_url:
-                    s_name = item.ref_skill.name if item.ref_skill else "Skill"
-                    item.ref_url = f"https://google.com/search?q={s_name.replace(' ', '+')}+tutorial+docs"
-                    item.ref_provider = f"{s_name.upper()} PRACTICE LAB"
-                    modified = True
+                if item.type == RoadmapItemType.SKILL:
+                    s_name = item.ref_skill.name if item.ref_skill else "Technical Skill"
+                    res = InternetSearchEngine.search_skill_resource(s_name)
+                    if not item.ref_url or "google.com/search" in item.ref_url:
+                        item.ref_url = res["url"]
+                        item.ref_provider = f"{s_name.upper()} PRACTICE LAB"
+                        modified = True
 
                 # 3. Backfill ref_url and ref_provider for RESOURCE items
                 if item.type == RoadmapItemType.RESOURCE:
-                    if item.ref_skill_id:
-                        matched_res = next((r for r in catalog_resources if any(s.id == item.ref_skill_id for s in r.skills)), None)
-                        if matched_res:
-                            new_url = matched_res.url
-                            new_provider = matched_res.provider
-                        else:
-                            s_name = item.ref_skill.name if item.ref_skill else "Technical Skills"
-                            new_url = f"https://developer.mozilla.org/en-US/search?q={s_name.replace(' ', '+')}"
-                            new_provider = f"{s_name} Official Docs"
-                    else:
-                        new_url = "https://developer.mozilla.org/"
-                        new_provider = "Official Documentation"
-
-                    if item.ref_url != new_url or item.ref_provider != new_provider:
-                        item.ref_url = new_url
-                        item.ref_provider = new_provider
+                    s_name = item.ref_skill.name if item.ref_skill else "Technical Skills"
+                    res = InternetSearchEngine.search_skill_resource(s_name)
+                    if not item.ref_url or "google.com/search" in item.ref_url or "developer.mozilla.org" in item.ref_url:
+                        item.ref_url = res["url"]
+                        item.ref_provider = res["provider"]
                         modified = True
 
-                # 4. Backfill ref_url for MILESTONE items
+                # 4. Backfill ref_url for MILESTONE items to point to real GitHub open-source blueprints
                 if item.type == RoadmapItemType.MILESTONE:
-                    if item.ref_url != "https://github.com/":
-                        item.ref_url = "https://github.com/"
-                        item.ref_provider = "SkillForge Portfolio Project"
+                    s_name = item.ref_skill.name if item.ref_skill else ""
+                    m_spec = InternetSearchEngine.search_milestone_spec(item.title, s_name)
+                    if not item.ref_url or item.ref_url == "https://github.com/" or item.ref_url == "https://github.com":
+                        item.ref_url = m_spec["url"]
+                        item.ref_provider = m_spec["provider"]
                         modified = True
 
         if modified:
