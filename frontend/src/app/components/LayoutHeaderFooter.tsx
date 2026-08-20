@@ -21,10 +21,11 @@ export default function LayoutHeaderFooter({ children }: { children: React.React
     pathname.startsWith('/sign-up')
 
   if (isStandaloneRoute) {
-    return <div className="h-screen w-screen overflow-hidden flex flex-col">{children}</div>
+    // For dashboard and full-page flows, enable smooth vertical scrolling
+    return <div className="min-h-screen w-full overflow-x-hidden overflow-y-auto flex flex-col">{children}</div>
   }
 
-  // Public routes (home /, /about, /blog) - Header is 100% STATIC at top, only main scrolls
+  // Public routes (home /, /about, /blog) - Header is static at top, main scrolls smoothly
   return (
     <div className="h-screen w-screen overflow-hidden flex flex-col bg-slate-50 text-slate-900 glow-gradient">
       {/* Static Fixed Top Header */}

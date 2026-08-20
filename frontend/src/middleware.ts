@@ -49,7 +49,16 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
-  const protectedRoutes = ['/dashboard', '/onboarding', '/skills', '/roadmap', '/recommendations']
+  // All internal dashboard routes require compulsory login
+  const protectedRoutes = [
+    '/dashboard',
+    '/skills',
+    '/roadmap',
+    '/recommendations',
+    '/interview',
+    '/progress',
+    '/onboarding',
+  ]
 
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 

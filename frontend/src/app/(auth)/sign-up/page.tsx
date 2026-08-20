@@ -6,6 +6,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { AlertCircle, Loader2, X, Eye, EyeOff, CheckCircle2, ArrowRight, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
@@ -67,8 +69,8 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex items-center justify-center p-4 sm:p-8 bg-slate-50 relative">
-      <div className="w-full max-w-6xl h-full max-h-[680px] bg-white rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 relative overflow-hidden">
+    <div className="h-screen w-screen overflow-hidden flex items-center justify-center p-4 sm:p-8 bg-dot-grid bg-slate-50 relative">
+      <div className="w-full max-w-6xl h-full max-h-[680px] bg-white/95 backdrop-blur-2xl rounded-3xl border border-slate-200/90 shadow-2xl p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 relative overflow-hidden">
         
         {/* Left Column: Auth Form Area (7 Cols) */}
         <div className="lg:col-span-7 flex flex-col justify-between p-4 sm:p-6 h-full overflow-y-auto">
@@ -76,33 +78,33 @@ export default function SignUpPage() {
           <div className="flex items-center justify-between">
             <Link
               href="/"
-              className="flex items-center gap-2 font-black text-lg tracking-tight text-slate-900"
+              className="flex items-center gap-2.5 font-black text-xl tracking-tight text-slate-900 group"
             >
-              <div className="p-1.5 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
+              <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20 group-hover:scale-105 transition-transform">
                 <Zap className="w-4 h-4 fill-current" />
               </div>
-              <span>SkillForge <span className="text-indigo-600">AI</span></span>
+              <span className="font-outfit">SkillForge <span className="text-indigo-600">AI</span></span>
             </Link>
           </div>
 
           {/* Form Content */}
           <div className="max-w-md w-full mx-auto my-auto py-2 space-y-4">
             <div className="text-left space-y-1">
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">Create Student Account</h1>
-              <p className="text-xs text-slate-500 font-medium">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit">Create Student Account</h1>
+              <p className="text-xs sm:text-sm text-slate-500 font-normal">
                 Sign up and build your personalized career roadmap
               </p>
             </div>
 
             {error && (
-              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800 text-xs font-medium">
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800 text-xs font-medium">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
                 <span>{error}</span>
               </div>
             )}
 
             {status === 'redirecting' && (
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-800 text-xs font-bold">
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-800 text-xs font-bold">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
                 <span>Account created! Redirecting to dashboard...</span>
               </div>
@@ -120,7 +122,7 @@ export default function SignUpPage() {
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Alex Mercer"
                   disabled={status !== 'idle'}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
                 />
               </div>
 
@@ -135,7 +137,7 @@ export default function SignUpPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="student@example.com"
                   disabled={status !== 'idle'}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
                 />
               </div>
 
@@ -152,7 +154,7 @@ export default function SignUpPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="•••••••• (min 6 characters)"
                     disabled={status !== 'idle'}
-                    className="w-full pl-4 pr-12 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
+                    className="w-full pl-4 pr-12 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -165,20 +167,16 @@ export default function SignUpPage() {
               </div>
 
               {status === 'idle' && (
-                <button
+                <Button
                   type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all disabled:opacity-50 mt-3 cursor-pointer flex items-center justify-center gap-2"
+                  variant="primary"
+                  size="lg"
+                  className="w-full mt-3"
+                  isLoading={loading}
+                  rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <span>Create Free Account</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+                  Create Free Account
+                </Button>
               )}
             </form>
           </div>

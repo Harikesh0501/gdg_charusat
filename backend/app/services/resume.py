@@ -206,18 +206,23 @@ class ResumeService:
                 extracted_json=ai_result.model_dump(),
             )
 
-            # 8. Set status to processed
+            # 8. Set status to processed & commit immediately
             bg_repo.update_resume_status(resume_id, ResumeStatus.PROCESSED)
+            bg_db.commit()
             logger.info(f"Resume {resume_id} successfully processed with {len(matched_skills_map)} skills extracted.")
 
-            # 9. Auto-regenerate active roadmap based on new extracted resume skills
+            # 9. Auto-regenerate active roadmap in detached background block
             try:
                 from app.services.roadmap import RoadmapService
-                roadmap_service = RoadmapService(bg_db)
-                goal = roadmap_service.career_repo.get_active_career_goal(profile_id)
-                if goal:
-                    await roadmap_service.generate_roadmap(profile_id, goal.career_role_id)
-                    logger.info(f"Auto-regenerated roadmap for profile {profile_id} after resume extraction.")
+                roadmap_db = SessionLocal()
+                try:
+                    roadmap_service = RoadmapService(roadmap_db)
+                    goal = roadmap_service.career_repo.get_active_career_goal(profile_id)
+                    if goal:
+                        await roadmap_service.generate_roadmap(profile_id, goal.career_role_id)
+                        logger.info(f"Auto-regenerated roadmap for profile {profile_id} after resume extraction.")
+                finally:
+                    roadmap_db.close()
             except Exception as r_err:
                 logger.warn(f"Auto-roadmap generation after resume note: {r_err}")
 

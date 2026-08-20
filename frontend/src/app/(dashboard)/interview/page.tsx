@@ -23,6 +23,9 @@ import {
   FolderGit2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 
 interface Question {
   id: string
@@ -71,13 +74,19 @@ interface InterviewHistoryData {
   history: HistoryItem[]
 }
 
+// In-Memory Client Cache for 0ms Instant Page Switches
+const _INTERVIEW_CACHE: {
+  questions?: PracticeQuestionsData
+  history?: InterviewHistoryData
+} = {}
+
 export default function MockInterviewPage() {
-  const [questionsData, setQuestionsData] = useState<PracticeQuestionsData | null>(null)
-  const [historyData, setHistoryData] = useState<InterviewHistoryData | null>(null)
+  const [questionsData, setQuestionsData] = useState<PracticeQuestionsData | null>(_INTERVIEW_CACHE.questions || null)
+  const [historyData, setHistoryData] = useState<InterviewHistoryData | null>(_INTERVIEW_CACHE.history || null)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [answerText, setAnswerText] = useState('')
   const [hasSkillsOrResume, setHasSkillsOrResume] = useState<boolean>(true)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!_INTERVIEW_CACHE.questions)
   const [evaluating, setEvaluating] = useState(false)
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
   const [activeTab, setActiveTab] = useState<'practice' | 'history'>('practice')
@@ -89,7 +98,9 @@ export default function MockInterviewPage() {
 
   const fetchQuestions = async () => {
     try {
-      setLoading(true)
+      if (!_INTERVIEW_CACHE.questions) {
+        setLoading(true)
+      }
       const supabase = createClient()
       const { data: sessionData } = await supabase.auth.getSession()
 
@@ -128,6 +139,7 @@ export default function MockInterviewPage() {
         data.questions = shuffled
       }
 
+      _INTERVIEW_CACHE.questions = data
       setQuestionsData(data)
       setCurrentIdx(0)
       setAnswerText('')
@@ -154,6 +166,7 @@ export default function MockInterviewPage() {
       const res = await fetch(`${backendUrl}/api/interview/history`, { headers })
       if (res.ok) {
         const data: InterviewHistoryData = await res.json()
+        _INTERVIEW_CACHE.history = data
         setHistoryData(data)
       }
     } catch (err) {
@@ -198,6 +211,7 @@ export default function MockInterviewPage() {
     }
   }
 
+  // 0ms Instant Next Question
   const handleNextQuestion = () => {
     if (questionsData && currentIdx < questionsData.questions.length - 1) {
       setCurrentIdx(currentIdx + 1)
@@ -211,35 +225,22 @@ export default function MockInterviewPage() {
   // Mandatory Resume Banner Guard
   if (!hasSkillsOrResume && !loading) {
     return (
-      <div className="flex-1 max-w-7xl mx-auto px-8 py-12 w-full space-y-8">
-        <div className="border-b border-slate-200 pb-6 glass-panel p-6 rounded-2xl shadow-xs bg-white">
-          <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">
-            <BrainCircuit className="w-4 h-4 text-indigo-600" />
-            <span>AI Mock Interview Assistant</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Adaptive Interview Practice</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Practice technical and project-driven interview questions generated strictly from your uploaded resume.
-          </p>
-        </div>
-
-        <div className="glass-panel p-12 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-5 shadow-sm bg-white">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600 shadow-2xs">
+      <div className="flex-1 max-w-7xl mx-auto px-6 sm:px-8 py-12 w-full space-y-8 bg-dot-grid bg-slate-50/40 min-h-full">
+        <div className="p-12 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200 text-center max-w-xl mx-auto space-y-5 shadow-2xs">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-600 shadow-2xs">
             <UploadCloud className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">Upload Your Resume First</h3>
-            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-md mx-auto">
-              SkillForge generates adaptive interview questions strictly derived from your uploaded resume projects & skills. Please upload your resume first to generate questions.
+            <Badge variant="purple" size="sm" className="mb-2">Resume Required</Badge>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight font-outfit">Upload Your Resume First</h3>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-md mx-auto font-normal">
+              SkillForge generates adaptive interview questions strictly derived from your uploaded resume projects & skills. Upload your resume first to practice.
             </p>
           </div>
-          <Link
-            href="/skills"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Upload Resume Now</span>
-            <ArrowRight className="w-4 h-4" />
+          <Link href="/skills" className="inline-block">
+            <Button variant="primary" size="md" rightIcon={<ArrowRight className="w-4 h-4" />}>
+              Upload Resume Now
+            </Button>
           </Link>
         </div>
       </div>
@@ -247,52 +248,52 @@ export default function MockInterviewPage() {
   }
 
   return (
-    <div className="flex-1 max-w-7xl mx-auto px-8 py-8 w-full space-y-8">
-      {/* Header */}
-      <div className="border-b border-slate-200 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl shadow-xs bg-white">
+    <div className="flex-1 max-w-7xl mx-auto px-6 sm:px-8 py-8 w-full space-y-8 bg-dot-grid bg-slate-50/40 min-h-full">
+      {/* Header Banner */}
+      <div className="relative rounded-3xl p-6 sm:p-8 bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col md:flex-row md:items-center justify-between gap-6 overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-600" />
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">
-            <BrainCircuit className="w-4 h-4 text-indigo-600" />
-            <span>AI Mock Interview Assistant</span>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="purple" size="sm" dot>
+              AI Lead Interviewer Active
+            </Badge>
+            {questionsData?.career_role_name && (
+              <Badge variant="info" size="sm">
+                Target Role: {questionsData.career_role_name}
+              </Badge>
+            )}
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Adaptive Interview Practice</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Practice technical and project-driven interview questions generated strictly from your uploaded resume.
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-outfit">
+            AI Mock Interview Studio
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
+            Grounded technical and project-specific mock questions evaluated against Groq Llama 3.3 70B rubrics.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          {historyData && (
-            <div className="flex items-center gap-4 px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold shadow-2xs">
-              <div>
-                <span className="text-slate-400 block uppercase tracking-wider text-[10px]">Total Attempts</span>
-                <span className="text-slate-900 text-sm font-black">{historyData.total_attempts}</span>
-              </div>
-              <div className="border-l border-slate-200 pl-4">
-                <span className="text-slate-400 block uppercase tracking-wider text-[10px]">Avg Score</span>
-                <span className="text-emerald-600 text-sm font-black">{historyData.average_score}%</span>
-              </div>
+        {historyData && (
+          <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <div>
+              <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-bold">Total Attempts</span>
+              <span className="text-slate-900 text-lg font-black font-outfit">{historyData.total_attempts}</span>
             </div>
-          )}
-
-          {questionsData?.career_role_name && (
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold shadow-2xs">
-              <Target className="w-4 h-4 text-indigo-600" />
-              <span>{questionsData.career_role_name}</span>
+            <div className="border-l border-slate-200 pl-4">
+              <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-bold">Average Score</span>
+              <span className="text-emerald-600 text-lg font-black font-outfit">{historyData.average_score}%</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs Bar - 0ms Instant Tab Switch */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2 p-1 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-2xs">
           <button
             onClick={() => setActiveTab('practice')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
               activeTab === 'practice'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
             }`}
           >
             <BrainCircuit className="w-4 h-4" />
@@ -301,10 +302,10 @@ export default function MockInterviewPage() {
 
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
               activeTab === 'history'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
             }`}
           >
             <History className="w-4 h-4" />
@@ -313,13 +314,14 @@ export default function MockInterviewPage() {
         </div>
 
         {activeTab === 'practice' && (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<RefreshCw className="w-3.5 h-3.5 text-indigo-600" />}
             onClick={fetchQuestions}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-all border border-slate-200 shadow-2xs cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
-            <span>New Session Kit</span>
-          </button>
+            New Session Kit
+          </Button>
         )}
       </div>
 
@@ -327,67 +329,67 @@ export default function MockInterviewPage() {
       {activeTab === 'practice' && (
         <div className="space-y-6">
           {loading ? (
-            <div className="py-20 text-center space-y-3 text-slate-500">
+            <div className="py-24 text-center space-y-3 text-slate-500 bg-white/60 backdrop-blur-xl rounded-3xl border border-slate-200">
               <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-              <p className="text-sm font-medium">Assembling adaptive mock interview questions...</p>
+              <p className="text-sm font-semibold text-slate-800">Generating personalized interview questions...</p>
             </div>
           ) : !activeQuestion ? (
-            <div className="glass-panel p-10 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-xs bg-white">
+            <div className="p-10 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-2xs">
               <Target className="w-10 h-10 text-indigo-600 mx-auto" />
-              <h3 className="text-lg font-bold text-slate-900">No Questions Available</h3>
-              <p className="text-sm text-slate-500">
+              <h3 className="text-lg font-bold text-slate-900 font-outfit">No Questions Available</h3>
+              <p className="text-xs text-slate-500 font-normal">
                 Select a target career role in the Roadmap page to generate personalized interview questions.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Question Workspace (Left 2 cols) */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Question Card */}
-                <div className="glass-panel p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-4 bg-white">
+                <div className="p-6 sm:p-7 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold uppercase">
+                      <Badge variant="purple" size="sm">
                         {activeQuestion.category.replace('_', ' ')}
-                      </span>
+                      </Badge>
 
                       {activeQuestion.category === 'project_specific' && (
-                        <span className="px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold flex items-center gap-1.5">
-                          <FolderGit2 className="w-3.5 h-3.5 text-purple-600" />
-                          <span>Resume Project Question</span>
-                        </span>
+                        <Badge variant="info" size="sm">
+                          <FolderGit2 className="w-3.5 h-3.5 text-sky-600 mr-1" />
+                          Resume Project Question
+                        </Badge>
                       )}
 
-                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">
+                      <Badge variant="default" size="sm">
                         Difficulty: {activeQuestion.difficulty}/5
-                      </span>
+                      </Badge>
 
                       {activeQuestion.source_reference && (
                         <a
                           href={activeQuestion.reference_url || '#'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200 hover:bg-emerald-100 transition-all shadow-2xs group/source"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 hover:bg-emerald-100 transition-all shadow-2xs"
                         >
-                          <BookOpen className="w-3.5 h-3.5 text-emerald-600 group-hover/source:scale-110 transition-transform" />
+                          <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
                           <span>Source: {activeQuestion.source_reference}</span>
                           <ExternalLink className="w-3 h-3 text-emerald-600 opacity-70" />
                         </a>
                       )}
                     </div>
 
-                    <span className="text-xs font-bold text-slate-500">
+                    <span className="text-xs font-bold text-slate-500 font-outfit">
                       Question {currentIdx + 1} of {questionsData?.questions.length || 1}
                     </span>
                   </div>
 
-                  <h2 className="text-lg font-bold text-slate-900 leading-relaxed pt-1">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed font-outfit">
                     {activeQuestion.question_text}
                   </h2>
                 </div>
 
                 {/* Answer Editor */}
-                <div className="glass-panel p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-4 bg-white">
+                <div className="p-6 sm:p-7 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                       <FileText className="w-4 h-4 text-indigo-600" />
@@ -403,45 +405,40 @@ export default function MockInterviewPage() {
                     onChange={(e) => setAnswerText(e.target.value)}
                     placeholder="Type your structured answer here. Include architectural considerations, trade-offs, and concrete technical details..."
                     disabled={evaluating || !!evaluation}
-                    className="w-full h-48 p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 text-xs font-medium focus:outline-none focus:border-indigo-500 focus:bg-white resize-none transition-all"
+                    className="w-full h-48 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white resize-none transition-all"
                   />
 
                   <div className="flex items-center justify-between pt-2">
                     {!evaluation ? (
-                      <button
+                      <Button
+                        variant="primary"
+                        size="md"
                         onClick={handleSubmitAnswer}
                         disabled={evaluating || answerText.trim().length < 5}
-                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
+                        isLoading={evaluating}
+                        leftIcon={<Send className="w-4 h-4" />}
                       >
-                        {evaluating ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Evaluating Response...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4" />
-                            <span>Submit for AI Assessment</span>
-                          </>
-                        )}
-                      </button>
+                        Submit for AI Assessment
+                      </Button>
                     ) : (
                       <div className="flex items-center gap-3">
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setEvaluation(null)}
-                          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all border border-slate-200 cursor-pointer"
                         >
                           Edit & Retake
-                        </button>
+                        </Button>
 
                         {currentIdx < (questionsData?.questions.length || 0) - 1 && (
-                          <button
+                          <Button
+                            variant="primary"
+                            size="sm"
                             onClick={handleNextQuestion}
-                            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
+                            rightIcon={<ChevronRight className="w-4 h-4" />}
                           >
-                            <span>Next Question</span>
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                            Next Question
+                          </Button>
                         )}
                       </div>
                     )}
@@ -452,24 +449,19 @@ export default function MockInterviewPage() {
               {/* AI Evaluation Card (Right col) */}
               <div className="lg:col-span-1">
                 {evaluation ? (
-                  <div className="glass-panel p-6 rounded-2xl border border-indigo-200 bg-gradient-to-br from-white via-indigo-50/30 to-slate-50 space-y-5 shadow-xs">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                  <div className="p-6 rounded-3xl bg-white/95 backdrop-blur-xl border border-indigo-200 shadow-[0_10px_25px_-5px_rgba(99,102,241,0.08)] space-y-5">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-900 uppercase tracking-wider">
                         <Sparkles className="w-4 h-4 text-indigo-600" />
-                        <span>Lead Interviewer Assessment</span>
+                        <span>Interviewer Score</span>
                       </div>
 
-                      <div
-                        className={`px-3 py-1 rounded-xl text-xs font-black border ${
-                          evaluation.score >= 75
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                            : evaluation.score >= 50
-                            ? 'bg-yellow-50 border-yellow-300 text-yellow-800'
-                            : 'bg-rose-50 border-rose-300 text-rose-800'
-                        }`}
+                      <Badge
+                        variant={evaluation.score >= 75 ? 'success' : evaluation.score >= 50 ? 'warning' : 'danger'}
+                        size="md"
                       >
                         Score: {evaluation.score}/100
-                      </div>
+                      </Badge>
                     </div>
 
                     {/* Strengths */}
@@ -481,7 +473,7 @@ export default function MockInterviewPage() {
                         </span>
                         <div className="space-y-1.5">
                           {evaluation.strengths.map((str, i) => (
-                            <div key={i} className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium">
+                            <div key={i} className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium">
                               {str}
                             </div>
                           ))}
@@ -498,7 +490,7 @@ export default function MockInterviewPage() {
                         </span>
                         <div className="space-y-1.5">
                           {evaluation.weaknesses.map((w, i) => (
-                            <div key={i} className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 font-medium">
+                            <div key={i} className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 font-medium">
                               {w}
                             </div>
                           ))}
@@ -507,19 +499,21 @@ export default function MockInterviewPage() {
                     )}
 
                     {/* Detailed Feedback */}
-                    <div className="space-y-1.5 pt-2 border-t border-slate-200">
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Actionable Feedback</span>
-                      <p className="text-xs text-slate-700 leading-relaxed italic bg-white p-3 rounded-xl border border-slate-200">
+                      <p className="text-xs text-slate-700 leading-relaxed italic bg-slate-50 p-3 rounded-xl border border-slate-200 font-normal">
                         &quot;{evaluation.feedback}&quot;
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="glass-panel p-8 rounded-2xl border border-slate-200 text-center space-y-4 shadow-xs bg-white">
-                    <Zap className="w-8 h-8 text-indigo-500 mx-auto" />
-                    <h3 className="text-sm font-bold text-slate-900">Real-Time Evaluation Ready</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      Submit your response to receive instant AI scoring, key technical strengths, missed concepts, and study recommendations.
+                  <div className="p-8 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200 text-center space-y-4 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto shadow-2xs">
+                      <Zap className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900 font-outfit">Real-Time AI Evaluation Ready</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed font-normal">
+                      Submit your response to receive instant AI scoring, key technical strengths, missed edge cases, and personalized recommendations.
                     </p>
                   </div>
                 )}
@@ -533,40 +527,35 @@ export default function MockInterviewPage() {
       {activeTab === 'history' && (
         <div className="space-y-4">
           {!historyData?.history || historyData.history.length === 0 ? (
-            <div className="glass-panel p-10 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-3 shadow-xs bg-white">
+            <div className="p-10 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200 text-center max-w-xl mx-auto space-y-3 shadow-2xs">
               <History className="w-8 h-8 text-slate-400 mx-auto" />
-              <h3 className="text-base font-bold text-slate-900">No Previous Attempts Found</h3>
+              <h3 className="text-base font-bold text-slate-900 font-outfit">No Previous Attempts Found</h3>
               <p className="text-xs text-slate-500">Complete practice questions to build your interview performance history.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
               {historyData.history.map((item) => (
-                <div key={item.attempt_id} className="glass-panel p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3 bg-white">
+                <div key={item.attempt_id} className="p-6 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs font-bold uppercase border border-slate-200">
+                      <Badge variant="default" size="sm">
                         {item.category.replace('_', ' ')}
-                      </span>
+                      </Badge>
                       <span className="text-xs text-slate-400 font-medium">
                         {new Date(item.created_at).toLocaleDateString()}
                       </span>
                     </div>
 
-                    <span
-                      className={`px-3 py-1 rounded-xl text-xs font-black border ${
-                        item.score >= 75
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                          : item.score >= 50
-                          ? 'bg-yellow-50 border-yellow-300 text-yellow-800'
-                          : 'bg-rose-50 border-rose-300 text-rose-800'
-                      }`}
+                    <Badge
+                      variant={item.score >= 75 ? 'success' : item.score >= 50 ? 'warning' : 'danger'}
+                      size="md"
                     >
                       Score: {item.score}%
-                    </span>
+                    </Badge>
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-900">{item.question_text}</h3>
-                  <p className="text-xs text-slate-600 italic bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <h3 className="text-base font-bold text-slate-900 font-outfit">{item.question_text}</h3>
+                  <p className="text-xs text-slate-600 italic bg-slate-50 p-3 rounded-xl border border-slate-100 font-normal">
                     &quot;{item.feedback}&quot;
                   </p>
                 </div>

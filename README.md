@@ -1,7 +1,7 @@
 # 🚀 SkillForge AI — AI-Powered Skill Intelligence & Career Acceleration Platform
 
 ![SkillForge AI Banner](https://img.shields.io/badge/SkillForge-AI_Powered-indigo?style=for-the-badge&logo=sparkles)
-![Next.js 14](https://img.shields.io/badge/Next.js_14-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![Next.js 15](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Groq AI](https://img.shields.io/badge/Groq_AI-Llama_3.3_70B-orange?style=for-the-badge&logo=openai&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
@@ -25,11 +25,12 @@ SkillForge AI is a state-of-the-art, resume-driven career acceleration platform 
 ## 🛠️ Technology Stack
 
 ### **Frontend**
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS & Vanilla CSS Design Tokens
-- **Icons & UI**: Lucide React, Shadcn UI patterns
-- **Auth Client**: `@supabase/supabase-js`
+- **Framework**: Next.js 15 (App Router, Turbopack, React 19)
+- **Language**: TypeScript (Strict Mode)
+- **State & Data Fetching**: SWR + React Server/Client Components
+- **Styling**: Tailwind CSS (Glassmorphic design system + custom tokens)
+- **Icons & UI**: Lucide React Icons
+- **Auth**: Supabase SSR (@supabase/ssr)
 
 ### **Backend**
 - **Framework**: FastAPI (Python 3.11)

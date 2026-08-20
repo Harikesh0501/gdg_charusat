@@ -8,7 +8,7 @@
 ### **Subtitle**: AI-Powered Adaptive Career Roadmap & Skill Development Engine
 - **Tagline**: Bridging Student Competencies to Target Industry Roles via Dynamic Gap Analysis & AI Mock Interviews.
 - **Presenter**: Harikesh Patel & Team (GDG CHARUSAT)
-- **Tech Stack Highlights**: Next.js 14 | FastAPI | PostgreSQL | Groq Cloud Llama-3.3-70B
+- **Tech Stack Highlights**: Next.js 15 | FastAPI | PostgreSQL | Groq Cloud Llama-3.3-70B
 
 ---
 
@@ -53,7 +53,7 @@
 
 | Layer | Technologies Used | Key Purpose |
 |---|---|---|
-| **Frontend** | Next.js 14 (App Router), React 18, Tailwind CSS | Glassmorphism UI tokens, fluid micro-animations, responsive layout |
+| **Frontend** | Next.js 15 (App Router), React 19, Tailwind CSS | Glassmorphism UI tokens, fluid micro-animations, responsive layout |
 | **Backend** | FastAPI (Python 3.11), SQLAlchemy 2.0 ORM | High-performance async REST API, Pydantic V2 validation |
 | **Database** | PostgreSQL, Alembic Migrations | Persistent user profiles, roadmap items, attempt logs, catalog |
 | **AI Engine** | Groq Cloud API (`llama-3.3-70b-versatile`) | Resume parsing, structured explanations, lead interviewer assessment |

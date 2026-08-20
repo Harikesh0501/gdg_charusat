@@ -23,6 +23,9 @@ import {
   GitBranch,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { Modal } from '@/components/ui/Modal'
 
 interface Milestone {
   id: string
@@ -59,11 +62,14 @@ interface RecommendationsData {
   items: RecommendationItem[]
 }
 
+// In-Memory Client Cache for 0ms Instant Tab Switches
+const _REC_CACHE: Record<string, RecommendationsData> = {}
+
 export default function RecommendationsPage() {
   const [activeCategory, setActiveCategory] = useState<'resource' | 'project' | 'certification'>('resource')
-  const [data, setData] = useState<RecommendationsData | null>(null)
+  const [data, setData] = useState<RecommendationsData | null>(_REC_CACHE['resource'] || null)
   const [hasSkillsOrResume, setHasSkillsOrResume] = useState<boolean>(true)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!_REC_CACHE['resource'])
   const [error, setError] = useState<string | null>(null)
 
   // Project Blueprint Modal & Milestone Progress State
@@ -71,6 +77,11 @@ export default function RecommendationsPage() {
   const [completedMilestones, setCompletedMilestones] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
+    // 0ms Instant Tab Switch from cache
+    if (_REC_CACHE[activeCategory]) {
+      setData(_REC_CACHE[activeCategory])
+      setLoading(false)
+    }
     fetchRecommendations(activeCategory)
   }, [activeCategory])
 
@@ -87,6 +98,7 @@ export default function RecommendationsPage() {
     }
   }, [])
 
+  // 0ms Instant Milestone Toggle
   const toggleMilestone = (projectId: number, milestoneId: string) => {
     const key = `${projectId}_${milestoneId}`
     const updated = { ...completedMilestones, [key]: !completedMilestones[key] }
@@ -98,7 +110,9 @@ export default function RecommendationsPage() {
 
   const fetchRecommendations = async (category: string) => {
     try {
-      setLoading(true)
+      if (!_REC_CACHE[category]) {
+        setLoading(true)
+      }
       setError(null)
       const supabase = createClient()
       const { data: sessionData } = await supabase.auth.getSession()
@@ -127,17 +141,22 @@ export default function RecommendationsPage() {
 
       if (!res.ok) {
         if (res.status === 404) {
-          setData({ category, items: [] })
+          const empty = { category, items: [] }
+          _REC_CACHE[category] = empty
+          setData(empty)
           return
         }
         throw new Error('Failed to load recommendations')
       }
 
       const result: RecommendationsData = await res.json()
+      _REC_CACHE[category] = result
       setData(result)
     } catch (err: any) {
       console.error(err)
-      setError(err.message || 'Unable to fetch recommendations')
+      if (!_REC_CACHE[category]) {
+        setError(err.message || 'Unable to fetch recommendations')
+      }
     } finally {
       setLoading(false)
     }
@@ -146,35 +165,22 @@ export default function RecommendationsPage() {
   // Mandatory Resume Banner Guard
   if (!hasSkillsOrResume && !loading) {
     return (
-      <div className="flex-1 max-w-7xl mx-auto px-8 py-12 w-full space-y-8">
-        <div className="border-b border-slate-200 pb-6 glass-panel p-6 rounded-2xl shadow-xs bg-white">
-          <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">
-            <Award className="w-4 h-4 text-indigo-600" />
-            <span>AI Recommendation Engine</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Personalized Learning & Projects</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Curated resources, hands-on portfolio projects, and certifications matched strictly to your active skill gaps.
-          </p>
-        </div>
-
-        <div className="glass-panel p-12 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-5 shadow-sm bg-white">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600 shadow-2xs">
+      <div className="flex-1 max-w-7xl mx-auto px-6 sm:px-8 py-12 w-full space-y-8 bg-dot-grid bg-slate-50/40 min-h-full">
+        <div className="p-12 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200 text-center max-w-xl mx-auto space-y-5 shadow-2xs">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-600 shadow-2xs">
             <UploadCloud className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">Upload Your Resume First</h3>
-            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-md mx-auto">
-              SkillForge surfaces candidate recommendations strictly matching your extracted resume skill gaps. Please upload your resume first to unlock recommendations.
+            <Badge variant="purple" size="sm" className="mb-2">Resume Required</Badge>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight font-outfit">Upload Your Resume First</h3>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-md mx-auto font-normal">
+              SkillForge surfaces candidate recommendations strictly matching your extracted resume skill gaps. Upload your resume first to unlock curated projects and resources.
             </p>
           </div>
-          <Link
-            href="/skills"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Upload Resume Now</span>
-            <ArrowRight className="w-4 h-4" />
+          <Link href="/skills" className="inline-block">
+            <Button variant="primary" size="md" rightIcon={<ArrowRight className="w-4 h-4" />}>
+              Upload Resume Now
+            </Button>
           </Link>
         </div>
       </div>
@@ -182,35 +188,37 @@ export default function RecommendationsPage() {
   }
 
   return (
-    <div className="flex-1 max-w-7xl mx-auto px-8 py-8 w-full space-y-8">
-      {/* Page Header */}
-      <div className="border-b border-slate-200 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl shadow-xs bg-white">
+    <div className="flex-1 max-w-7xl mx-auto px-6 sm:px-8 py-8 w-full space-y-8 bg-dot-grid bg-slate-50/40 min-h-full">
+      {/* Page Header Banner */}
+      <div className="relative rounded-3xl p-6 sm:p-8 bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] flex flex-col md:flex-row md:items-center justify-between gap-6 overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-600" />
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">
-            <Award className="w-4 h-4 text-indigo-600" />
-            <span>AI Recommendation Engine</span>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="purple" size="sm" dot>
+              Recommendation Engine
+            </Badge>
+            {data?.career_role_name && (
+              <Badge variant="info" size="sm">
+                Target Role: {data.career_role_name}
+              </Badge>
+            )}
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Personalized Learning & Projects</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Curated resources, hands-on portfolio projects, and certifications matched strictly to your active skill gaps.
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-outfit">
+            Projects, Courses & Certifications
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
+            Curated resources, hands-on portfolio blueprints, and certifications matched strictly to your active skill gaps.
           </p>
         </div>
-
-        {data?.career_role_name && (
-          <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold self-start md:self-auto shadow-2xs">
-            <Target className="w-4 h-4 text-indigo-600" />
-            <span>Target Role: {data.career_role_name}</span>
-          </div>
-        )}
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white border border-slate-200 shadow-2xs max-w-xl">
+      {/* Category Segmented Tabs - 0ms Instant Tab Switch */}
+      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-2xs max-w-xl">
         <button
           onClick={() => setActiveCategory('resource')}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
             activeCategory === 'resource'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
@@ -220,9 +228,9 @@ export default function RecommendationsPage() {
 
         <button
           onClick={() => setActiveCategory('project')}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
             activeCategory === 'project'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
@@ -232,9 +240,9 @@ export default function RecommendationsPage() {
 
         <button
           onClick={() => setActiveCategory('certification')}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
             activeCategory === 'certification'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
@@ -245,40 +253,37 @@ export default function RecommendationsPage() {
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="py-20 text-center space-y-3 text-slate-500">
+        <div className="py-24 text-center space-y-3 text-slate-500 bg-white/60 backdrop-blur-xl rounded-3xl border border-slate-200">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-          <p className="text-sm font-medium">Computing candidate scores & recommendations...</p>
+          <p className="text-sm font-semibold text-slate-800">Scoring & retrieving personalized recommendations...</p>
         </div>
       ) : error ? (
-        <div className="glass-panel p-6 rounded-2xl border border-rose-200 text-center text-rose-700 text-sm font-medium">
+        <div className="p-6 rounded-3xl bg-rose-50 border border-rose-200 text-center text-rose-700 text-sm font-medium">
           {error}
         </div>
       ) : !data?.career_role_name ? (
-        <div className="glass-panel p-10 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-xs bg-white">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
+        <div className="p-10 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-2xs">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-600 shadow-2xs">
             <Target className="w-7 h-7" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">No Target Career Role Selected</h3>
-          <p className="text-sm text-slate-500">
+          <h3 className="text-lg font-bold text-slate-900 font-outfit">No Target Career Role Selected</h3>
+          <p className="text-xs text-slate-500 font-normal">
             Select a target career role in the Learning Roadmap page to calculate skill gaps and surface curated recommendations.
           </p>
-          <Link
-            href="/roadmap"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Go to Roadmap Command Center</span>
-            <ArrowRight className="w-4 h-4" />
+          <Link href="/roadmap" className="inline-block">
+            <Button variant="primary" size="sm" rightIcon={<ArrowRight className="w-4 h-4" />}>
+              Go to Roadmap
+            </Button>
           </Link>
         </div>
       ) : !data?.items || data.items.length === 0 ? (
-        <div className="glass-panel p-10 rounded-2xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-xs bg-white">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
+        <div className="p-10 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200 text-center max-w-xl mx-auto space-y-4 shadow-2xs">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto text-emerald-600 shadow-2xs">
             <Sparkles className="w-7 h-7" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">All Gaps Covered for {data.career_role_name}!</h3>
-          <p className="text-sm text-slate-500">
-            You have satisfied the required proficiencies for this category, or no additional items are currently needed. Check other tabs or update your target role.
+          <h3 className="text-lg font-bold text-slate-900 font-outfit">All Gaps Covered for {data.career_role_name}!</h3>
+          <p className="text-xs text-slate-500 font-normal">
+            You have satisfied the required proficiencies for this category. Check other tabs or update your target role.
           </p>
         </div>
       ) : (
@@ -292,22 +297,22 @@ export default function RecommendationsPage() {
             return (
               <div
                 key={item.id}
-                className="glass-panel p-6 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-5 hover:border-indigo-200 hover:shadow-md transition-all group bg-white"
+                className="p-6 sm:p-7 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] hover:border-indigo-300 hover:shadow-[0_12px_28px_-6px_rgba(99,102,241,0.09)] transition-all flex flex-col justify-between space-y-5 group"
               >
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   {/* Provider & Verified Source Badges */}
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider border border-slate-200">
+                    <Badge variant="default" size="sm">
                       {item.provider || 'SkillForge Curation'}
-                    </span>
+                    </Badge>
 
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200">
+                      <Badge variant="purple" size="sm">
                         Score: {item.score.toFixed(1)}
-                      </span>
-                      <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 uppercase">
+                      </Badge>
+                      <Badge variant="success" size="sm">
                         {item.type || item.level || activeCategory}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
 
@@ -317,22 +322,22 @@ export default function RecommendationsPage() {
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-2xs"
                     >
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Source: GitHub Open Source Specification</span>
+                      <span>Source: Verified GitHub Blueprint</span>
                       <ExternalLink className="w-3 h-3 text-emerald-600" />
                     </a>
                   )}
 
                   {/* Title */}
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors font-outfit">
                     {item.title}
                   </h3>
 
                   {/* Description */}
                   {item.description && (
-                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-2 font-normal">
                       {item.description}
                     </p>
                   )}
@@ -340,27 +345,24 @@ export default function RecommendationsPage() {
                   {/* Matched Skill Badges */}
                   {item.matched_gap_skills && item.matched_gap_skills.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="text-xs text-slate-500 font-bold">Closes Gaps:</span>
+                      <span className="text-xs text-slate-400 font-semibold">Closes Gaps:</span>
                       {item.matched_gap_skills.map((skill, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold"
-                        >
+                        <Badge key={idx} variant="success" size="sm" dot>
                           {skill}
-                        </span>
+                        </Badge>
                       ))}
                     </div>
                   )}
 
                   {/* Milestone Progress Bar Preview for Projects */}
                   {isProject && milestones.length > 0 && (
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-700">
                         <span className="flex items-center gap-1.5">
                           <GitBranch className="w-3.5 h-3.5 text-indigo-600" />
                           <span>Implementation Progress</span>
                         </span>
-                        <span className="text-indigo-600">{doneCount}/{milestones.length} Steps ({pct}%)</span>
+                        <span className="text-indigo-600 font-outfit">{doneCount}/{milestones.length} Steps ({pct}%)</span>
                       </div>
                       <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                         <div
@@ -372,12 +374,12 @@ export default function RecommendationsPage() {
                   )}
 
                   {/* AI Personalized Explanation Box */}
-                  <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100 space-y-1.5">
+                  <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-1.5">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                       <span>AI Personalization Rationale</span>
                     </div>
-                    <p className="text-xs text-slate-700 leading-relaxed italic">
+                    <p className="text-xs text-slate-700 leading-relaxed italic font-normal">
                       &quot;{item.explanation}&quot;
                     </p>
                   </div>
@@ -385,7 +387,7 @@ export default function RecommendationsPage() {
 
                 {/* Card Footer: Metadata & Action Button */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                  <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>{item.estimated_hours}h est.</span>
@@ -397,22 +399,19 @@ export default function RecommendationsPage() {
                   </div>
 
                   {isProject ? (
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      leftIcon={<GitBranch className="w-3.5 h-3.5" />}
                       onClick={() => setSelectedProject(item)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
                     >
-                      <GitBranch className="w-3.5 h-3.5" />
-                      <span>View Blueprint & Milestones</span>
-                    </button>
+                      View Blueprint
+                    </Button>
                   ) : item.url ? (
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-2xs"
-                    >
-                      <span>View Resource</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="primary" size="sm" rightIcon={<ExternalLink className="w-3.5 h-3.5" />}>
+                        View Resource
+                      </Button>
                     </a>
                   ) : null}
                 </div>
@@ -422,59 +421,19 @@ export default function RecommendationsPage() {
         </div>
       )}
 
-      {/* PROJECT BLUEPRINT & MILESTONES MODAL */}
+      {/* PROJECT BLUEPRINT & MILESTONES MODAL - 0ms Instant Dialog */}
       {selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col space-y-6 p-6">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-bold uppercase tracking-wider border border-indigo-200">
-                    Project Implementation Blueprint
-                  </span>
-                  {selectedProject.url && (
-                    <a
-                      href={selectedProject.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Verified GitHub Spec ↗</span>
-                    </a>
-                  )}
-                </div>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  {selectedProject.title}
-                </h2>
-              </div>
-
-              <button
-                onClick={() => setSelectedProject(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Description & Metadata */}
-            <div className="space-y-3">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {selectedProject.description}
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" />
-                  <span>Estimated Time: {selectedProject.estimated_hours} Hours</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <BarChart3 className="w-4 h-4 text-indigo-600" />
-                  <span>Complexity Level: {selectedProject.difficulty}/5</span>
-                </div>
-              </div>
-            </div>
+        <Modal
+          isOpen={!!selectedProject}
+          onClose={() => setSelectedProject(null)}
+          size="xl"
+          title={selectedProject.title}
+          description="4-Phase Step-by-Step Implementation Blueprint & Architecture Specifications"
+        >
+          <div className="space-y-6">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+              {selectedProject.description}
+            </p>
 
             {/* Overall Progress Gauge Bar */}
             {(() => {
@@ -483,15 +442,15 @@ export default function RecommendationsPage() {
               const pct = milestones.length > 0 ? Math.round((doneCount / milestones.length) * 100) : 0
 
               return (
-                <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-2">
+                <div className="p-4 rounded-2xl bg-indigo-50/80 border border-indigo-100 space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-900">
                     <span className="flex items-center gap-2">
                       <GitBranch className="w-4 h-4 text-indigo-600" />
                       <span>Milestones Mastered</span>
                     </span>
-                    <span className="text-indigo-700">{doneCount} of {milestones.length} Completed ({pct}%)</span>
+                    <span className="text-indigo-700 font-outfit">{doneCount} of {milestones.length} Completed ({pct}%)</span>
                   </div>
-                  <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-emerald-500 transition-all duration-300"
                       style={{ width: `${pct}%` }}
@@ -514,7 +473,7 @@ export default function RecommendationsPage() {
                 return (
                   <div
                     key={m.id}
-                    className={`p-4 rounded-xl border flex items-start gap-3.5 transition-all ${
+                    className={`p-4 rounded-2xl border flex items-start gap-3.5 transition-all ${
                       isDone
                         ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
                         : 'bg-white border-slate-200/90 hover:border-indigo-200'
@@ -533,22 +492,20 @@ export default function RecommendationsPage() {
 
                     <div className="space-y-2 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className={`text-xs font-bold ${isDone ? 'text-emerald-900 line-through' : 'text-indigo-700'}`}>
+                        <span className={`text-xs font-bold font-outfit ${isDone ? 'text-emerald-900 line-through' : 'text-indigo-700'}`}>
                           {m.step}
                         </span>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                          isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
-                        }`}>
+                        <Badge variant={isDone ? 'success' : 'outline'} size="sm">
                           {isDone ? 'Completed ✓' : 'Pending'}
-                        </span>
+                        </Badge>
                       </div>
-                      <p className={`text-xs leading-relaxed ${isDone ? 'text-emerald-800/80' : 'text-slate-600'}`}>
+                      <p className={`text-xs leading-relaxed ${isDone ? 'text-emerald-800/80' : 'text-slate-600 font-normal'}`}>
                         {m.task}
                       </p>
 
                       {/* Dedicated Milestone Learning Resource Link */}
                       {m.resource_url && (
-                        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100/80 mt-2">
+                        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 mt-2">
                           <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
                             <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
                             <span>{m.resource_provider || 'Docs'}: {m.resource_title || 'Milestone Guide'}</span>
@@ -585,15 +542,17 @@ export default function RecommendationsPage() {
                 </a>
               )}
 
-              <button
+              <Button
+                variant="primary"
+                size="sm"
+                className="ml-auto"
                 onClick={() => setSelectedProject(null)}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 ml-auto cursor-pointer"
               >
                 Done
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

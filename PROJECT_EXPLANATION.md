@@ -16,7 +16,7 @@ Unlike conventional static course platforms, SkillForge continuously analyzes a 
 ## 🛠️ 2. Technology Stack & Component Inventory
 
 ### **Frontend Architecture**
-- **Framework**: Next.js 14 (App Router, Server & Client Components)
+- **Framework**: Next.js 15 (App Router, Turbopack, React 19, Server & Client Components)
 - **Language**: TypeScript (Strict Mode)
 - **Styling & Design System**: Vanilla CSS & Tailwind CSS with Glassmorphism UI tokens, custom HSL color palettes, and fluid micro-animations.
 - **Icons & Visuals**: Lucide React Icons
